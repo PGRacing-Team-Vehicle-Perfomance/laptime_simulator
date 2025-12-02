@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vehicle/vehicleHelper.h"
+
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -58,14 +60,14 @@ struct VehicleConfig{
     int redlineRpm = 12000;
     int idleRpm = 3000;
     int maxTorqueRpm = 5500;
-    std::vector<std::string> drivenWheels = {"LR", "RR"};
+    float tireScalingFactor = 0.77;
+    DriveType driveType = RWD;
 };
     
 
 struct SkidPadConfig {
     float minDiameter = 15.25;
     float maxDiameter = 21.25;
-    float tireScalingFactor = 0.77;
     float historicalTime = 5.1;
     float historicalBestTime = 4.856;
     float historicalPMax = 75;

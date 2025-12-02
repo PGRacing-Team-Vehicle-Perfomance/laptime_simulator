@@ -1,6 +1,7 @@
 #include "vehicle/vehicle.h"
 #include "config/config.h"
 #include "vehicle/tire/tire.h"
+#include "vehicle/vehicleHelper.h"
 
 #include <cstdio>
 #include <array>
@@ -14,11 +15,26 @@ int indexOf(const std::vector<T> &vec, const T &value)
     return (it == vec.end()) ? -1 : std::distance(vec.begin(), it);
 }
 
-Vehicle::Vehicle(VehicleConfig config, float tireScalingFactor) : config(config)
+Vehicle::Vehicle(VehicleConfig config) : config(config)
 {
-    for (auto wheel : WHEELS)
+    std::array<bool, 4> isWheelDriven;
+    isWheelDriven.fill(true);
+    
+    switch (config.driveType)
     {
-        tires.emplace(wheel, Tire(tireScalingFactor, config.quadFac, config.linFac));
+    case RWD:
+        isWheelDriven[Wheel::FL] = false;
+        isWheelDriven[Wheel::FR] = false;
+        break;
+    case FWD:
+        isWheelDriven[Wheel::RL] = false;
+        isWheelDriven[Wheel::RR] = false;
+        break;
+    }
+
+    for (int i = 0; i < Wheel::COUNT; i++)
+    {
+        tires[i] = Tire(config.tireScalingFactor, config.quadFac, config.linFac, isWheelDriven[i]);
     }
 
     /*
@@ -46,12 +62,11 @@ float Vehicle::getTireForces(float velocity, float acceleration, float airDensit
     SimConfig simConfig;
     simConfig.airDensity = airDensity;
     auto loads = totalTireLoads(velocity, acceleration, simConfig, isLateral);
-    std::vector<std::string> wheels = isLateral ? WHEELS : config.drivenWheels;
-
     float ret = 0;
-    for (auto wheel : wheels)
+    
+    for (int i = 0; i < Wheel::COUNT; i++)
     {
-        ret += tires[wheel].calculateForce(loads[indexOf(WHEELS, wheel)]);
+        ret += tires[i].calculateForce(loads[i], isLateral);
     }
 
     return ret;

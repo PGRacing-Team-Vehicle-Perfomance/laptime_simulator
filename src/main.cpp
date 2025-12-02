@@ -12,7 +12,7 @@ int main(){
     SimulationConstants simulationConstants;
     OptimizationConfig optconf;
     
-    Vehicle v(vc, skidPadConfig.tireScalingFactor);
+    Vehicle v(vc);
     SkidPad s(v, sc, skidPadConfig, optconf, simulationConstants);
     s.run();
 }

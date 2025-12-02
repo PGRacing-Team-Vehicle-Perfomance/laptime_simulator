@@ -2,9 +2,13 @@
 
 #include <cmath>
 
-Tire::Tire(float scalingFactor, float quadFac, float linFac) : scalingFactor(scalingFactor), quadFac(quadFac), linFac(linFac) {}
+Tire::Tire(float scalingFactor, float quadFac, float linFac, bool isDriven) : scalingFactor(scalingFactor), quadFac(quadFac), linFac(linFac), isDriven(isDriven) {}
 
-float Tire::calculateForce(float verticalLoad)
+float Tire::calculateForce(float verticalLoad, bool isLateral)
 {
-    return scalingFactor * (quadFac * std::pow(verticalLoad, 2) + linFac * verticalLoad);
+    if (isDriven || isLateral)
+    {
+        return scalingFactor * (quadFac * std::pow(verticalLoad, 2) + linFac * verticalLoad);   
+    }
+    return 0;
 }
