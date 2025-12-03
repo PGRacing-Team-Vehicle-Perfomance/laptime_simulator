@@ -8,7 +8,7 @@ class SkidPad
     SkidPadConfig trackConfig;
     SimulationConstants simulationConstants;
     SimConfig simConfig;
-    Vehicle vehicle;
+    Vehicle& vehicle;
     OptimizationConfig optimizationConfig;
 
 public:

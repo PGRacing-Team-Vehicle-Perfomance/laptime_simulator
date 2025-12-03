@@ -3,36 +3,27 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
-#include <cstdio>
-#include <array>
 #include <algorithm>
 #include <cmath>
 
-template <typename T>
-int indexOf(const std::vector<T> &vec, const T &value)
-{
-    auto it = std::find(vec.begin(), vec.end(), value);
-    return (it == vec.end()) ? -1 : std::distance(vec.begin(), it);
-}
-
 Vehicle::Vehicle(VehicleConfig config) : config(config)
 {
-    std::array<bool, 4> isWheelDriven;
-    isWheelDriven.fill(true);
+    CarWheelBase<bool> isWheelDriven;
+    for (size_t i = 0; i < tires.WHEEL_COUNT; i++) isWheelDriven[i] = true;
     
     switch (config.driveType)
     {
     case RWD:
-        isWheelDriven[Wheel::FL] = false;
-        isWheelDriven[Wheel::FR] = false;
+        isWheelDriven.fl = false;
+        isWheelDriven.fr = false;
         break;
     case FWD:
-        isWheelDriven[Wheel::RL] = false;
-        isWheelDriven[Wheel::RR] = false;
+        isWheelDriven.rl = false;
+        isWheelDriven.rr = false;
         break;
     }
 
-    for (int i = 0; i < Wheel::COUNT; i++)
+    for (size_t i = 0; i < tires.WHEEL_COUNT; i++)
     {
         tires[i] = Tire(config.tireScalingFactor, config.quadFac, config.linFac, isWheelDriven[i]);
     }
@@ -57,14 +48,12 @@ Vehicle::Vehicle(VehicleConfig config) : config(config)
     */
 }
 
-float Vehicle::getTireForces(float velocity, float acceleration, float airDensity, bool isLateral)
+float Vehicle::getTireForces(float velocity, float acceleration, const SimConfig& simConfig, bool isLateral)
 {
-    SimConfig simConfig;
-    simConfig.airDensity = airDensity;
     auto loads = totalTireLoads(velocity, acceleration, simConfig, isLateral);
     float ret = 0;
     
-    for (int i = 0; i < Wheel::COUNT; i++)
+    for (size_t i = 0; i < tires.WHEEL_COUNT; i++)
     {
         ret += tires[i].calculateForce(loads[i], isLateral);
     }
@@ -72,49 +61,61 @@ float Vehicle::getTireForces(float velocity, float acceleration, float airDensit
     return ret;
 }
 
-std::array<float, 4> Vehicle::totalTireLoads(float velocity, float acceleration, SimConfig simConfig, bool isLateral)
+CarWheelBase<float> Vehicle::totalTireLoads(float velocity, float acceleration, const SimConfig& simConfig, bool isLateral)
 {
-    auto static_load = staticLoad(simConfig);
-    auto aero = aeroLoad(velocity, simConfig);
+    auto static_load = staticLoad(simConfig.earthAcc);
+    auto aero = aeroLoad(velocity, simConfig.airDensity);
     auto transfer = loadTransfer(acceleration, isLateral);
-    std::array<float, 4> ret;
-    for (int i = 0; i < 4; i++)
+    CarWheelBase<float> ret;
+    for (size_t i = 0; i < tires.WHEEL_COUNT; i++)
     {
         ret[i] = std::max(0.f, static_load[i] + aero[i] + transfer[i]);
     }
     return ret;
 }
 
-std::array<float, 4> Vehicle::staticLoad(SimConfig simConfig)
+CarWheelBase<float> Vehicle::staticLoad(float earthAcc)
 {
-    return distributeForces(config.mass * simConfig.earthAcc, config.frontWeightDist, config.leftWeightDist);
+    return distributeForces(config.mass * earthAcc, config.frontWeightDist, config.leftWeightDist);
 }
 
-std::array<float, 4> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist)
+CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist)
 {
-    float lf = totalForce * frontDist * leftDist;
-    float rf = totalForce * frontDist * (1 - leftDist);
-    float lr = totalForce * (1 - frontDist) * leftDist;
-    float rr = totalForce * (1 - frontDist) * (1 - leftDist);
-    return {lf, rf, lr, rr};
+    CarWheelBase<float> forces;
+    forces.fl = totalForce * frontDist * leftDist;
+    forces.fr = totalForce * frontDist * (1 - leftDist);
+    forces.rl = totalForce * (1 - frontDist) * leftDist;
+    forces.rr = totalForce * (1 - frontDist) * (1 - leftDist);
+    return forces;
 }
 
-std::array<float, 4> Vehicle::aeroLoad(float velocity, SimConfig simConfig)
+CarWheelBase<float> Vehicle::aeroLoad(float velocity, float airDensity)
 {
-    float totalForce = 0.5 * config.cla * simConfig.airDensity * std::pow(velocity, 2);
+    float totalForce = 0.5 * config.cla * airDensity * std::pow(velocity, 2);
     return distributeForces(totalForce, config.frontAeroDist, config.leftAeroDist);
 }
 
-std::array<float, 4> Vehicle::loadTransfer(float acceleration, bool isLateral)
+CarWheelBase<float> Vehicle::loadTransfer(float acceleration, bool isLateral)
 {
+    CarWheelBase<float> loads;
     float moment = acceleration * config.mass * config.cogHeight;
     if (isLateral)
     {
         float front = moment * config.frontWeightDist / config.frontTrackWidth;
         float rear = moment * (1 - config.frontWeightDist) / config.rearTrackWidth;
-        return {-front, front, -rear, rear};
+        loads.fl = -front;
+        loads.fr = front;
+        loads.rl = -rear;
+        loads.rr = rear;
+        return loads;
     }
     float transfer = moment / config.wheelbase;
     float left = config.leftWeightDist;
-    return {-transfer * left, -transfer * (1 - left), transfer * left, transfer * (1 - left)};
+    
+    loads.fl = -transfer * left;
+    loads.fr = -transfer * (1 - left);
+    loads.rl = transfer * left;
+    loads.rr = transfer * (1 - left);
+    
+    return loads;
 }
