@@ -13,5 +13,5 @@ protected:
 public:
     Simulation(Vehicle &vehicle, SimConfig simConfig, SimulationConstants simulationConstants);
     virtual float run() = 0;
-    float calculatePoints(float time, float tMax, float pMax, const std::array<float, 3> &coef) const;
+    virtual float calculatePoints(float time, const PointsConfig &pointsConfig) const = 0;
 };

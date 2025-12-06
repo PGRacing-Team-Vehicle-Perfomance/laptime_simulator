@@ -13,9 +13,19 @@ class Vehicle
     CarWheelBase<float> staticLoad(float earthAcc);
     CarWheelBase<float> aeroLoad(float velocity, float airDensity);
     CarWheelBase<float> loadTransfer(float acceleration, bool isLateral);
+    float getEngineTorque(float rpm);
+    float getWheelTorque(float engine_torque, int gear);
 
 public:
     Vehicle(VehicleConfig config);
     float getTireForces(float startSpeed, float acceleration, const SimConfig &simConfig, bool isLateral);
+    float speedToRpm(float speed_ms, int gear);
+    float getPowerThrust(float speed_ms, int gear);
+
     float getMass();
+    float getCRR();
+    float getCDA();
+    float getMaxTorqueRpm();
+    unsigned int getGearCount();
+    float getShiftTime();
 };

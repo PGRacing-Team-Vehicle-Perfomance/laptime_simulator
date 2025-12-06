@@ -3,7 +3,6 @@
 #include "vehicle/vehicleHelper.h"
 
 #include <vector>
-#include <unordered_map>
 #include <array>
 
 struct SimConfig
@@ -29,11 +28,11 @@ struct VehicleConfig
     float frontAeroDist = 0.5;
     float quadFac = -0.0002;
     float linFac = 1.8109;
-    float cdA = 1.3;
-    float cRr = 0.015;
+    float cda = 1.3;
+    float crr = 0.015;
     float wheelbase = 1.53;
     float wheelRadius = 0.2;
-    std::unordered_map<int, float> torqueCurve = {
+    std::vector<std::pair<int, float>> torqueCurve = {
         {3000, 20.0},
         {3500, 56.0},
         {4000, 62.5},
@@ -78,41 +77,15 @@ struct SkidPadConfig
     float diameterOffset = 1.3;
 };
 
+struct AccelerationConfig
+{
+    float startSpeed = 5;
+    float length = 75.0;
+};
+
 struct SimulationConstants
 {
     int trackMaxIterations = 50; // Reduced for early stopping
     int trackMinIterations = 5;  // Ensure stability
     float dragTimeout = 20.0;
 };
-
-/*
-struct OptimizationConfig
-{
-    plot_dir: str = 'plots'
-    max_workers: int = max(1, cpu_count() - 1)  # Optimized for more cores
-    single_sweep_range: Tuple[float, float] = (0.9, 1.1)
-    single_sweep_points: int = 30
-    multi_sweep_range: Tuple[float, float, int] = (0.85, 1.15, 5)  # Reduced points for coarse grid
-    max_combinations: int = 100000  # Limit combinations
-    exclude_params: Set[str] = field(
-        default_factory=lambda: {
-            #'quad_fac',
-            #'lin_fac',
-            'left_weight_dist',
-            'left_aero_dist',
-            #'c_rr',
-            #'wheelbase',
-            'wheel_radius',
-            'final_drive_ratio',
-            'shift_time',
-            'redline_rpm',
-            'idle_rpm',
-            'max_torque_rpm',
-            'torque_curve',
-            'gear_ratios',
-            'driven_wheels',
-        }
-    )
-    bool enablePlots = false; // Disable plotting by default
-};
-*/

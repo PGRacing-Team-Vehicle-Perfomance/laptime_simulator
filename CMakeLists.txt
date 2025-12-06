@@ -10,6 +10,7 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/vehicle/vehicle.cpp
     src/simulation/skidpad.cpp
+    src/simulation/acceleration.cpp
     src/simulation/simulation.cpp
     src/vehicle/tire/tire.cpp
 )

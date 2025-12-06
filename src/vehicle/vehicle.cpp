@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 Vehicle::Vehicle(VehicleConfig config) : config(config)
 {
@@ -28,25 +29,6 @@ Vehicle::Vehicle(VehicleConfig config) : config(config)
     {
         tires[i] = Tire(config.tireScalingFactor, config.quadFac, config.linFac, isWheelDriven[i]);
     }
-
-    /*
-    if (not all(wheel in self.WHEELS for wheel in config.driven_wheels))
-    {
-        abort();
-        // raise ValueError(f'Driven wheels {config.driven_wheels} must be a subset of {self.WHEELS}')
-    }
-    */
-    /*
-    rpms, torques = zip(*config.torque_curve)
-    torque_interp = lru_cache(maxsize=1000)(interp1d(rpms, torques, kind='linear', fill_value='extrapolate'))
-    self.gear_speed_ranges = [
-        (
-            (config.idle_rpm * np.pi * config.wheel_radius) / (30 * ratio * config.final_drive_ratio),
-            (config.redline_rpm * np.pi * config.wheel_radius) / (30 * ratio * config.final_drive_ratio),
-        )
-        for ratio in config.gear_ratios
-    ]
-    */
 }
 
 float Vehicle::getTireForces(float velocity, float acceleration, const SimConfig &simConfig, bool isLateral)
@@ -122,3 +104,50 @@ CarWheelBase<float> Vehicle::loadTransfer(float acceleration, bool isLateral)
 }
 
 float Vehicle::getMass() { return config.mass; }
+float Vehicle::getCRR() { return config.crr; }
+float Vehicle::getCDA() { return config.cda; }
+float Vehicle::getMaxTorqueRpm() { return config.maxTorqueRpm; }
+unsigned int Vehicle::getGearCount() { return config.gearRatios.size(); }
+float Vehicle::getShiftTime() { return config.shiftTime; }
+
+float Vehicle::speedToRpm(float speed_ms, int gear)
+{
+    if (gear < 0 || gear >= config.gearRatios.size())
+    {
+        return config.idleRpm;
+    }
+    float ratio = config.gearRatios[gear] * config.finalDriveRatio;
+    float rpm = (speed_ms / config.wheelRadius) * (30 / std::numbers::pi_v<float>)*ratio;
+    return std::max(static_cast<float>(config.idleRpm), std::min(rpm, static_cast<float>(config.redlineRpm)));
+}
+
+float Vehicle::getPowerThrust(float speed_ms, int gear)
+{
+    float rpm = speedToRpm(speed_ms, gear);
+    float torque = getEngineTorque(rpm);
+    float wheelTorque = getWheelTorque(torque, gear);
+    float thrust = wheelTorque / config.wheelRadius;
+    return std::max(thrust, 0.f);
+}
+
+
+float Vehicle::getWheelTorque(float engine_torque, int gear)
+{
+    if (gear < 0 || gear >= config.gearRatios.size())
+    {
+        return 0.0;
+    }
+    return engine_torque * config.gearRatios[gear] * config.finalDriveRatio;
+}
+
+float Vehicle::getEngineTorque(float rpm)
+{
+    auto it = std::lower_bound(config.torqueCurve.begin(), config.torqueCurve.end(), rpm,
+                               [](auto& p, float v){ return p.first < v; });
+    if (it == config.torqueCurve.begin()) return it->second;
+    if (it == config.torqueCurve.end())   return (it-1)->second;
+
+    auto& [x0,y0] = *(it-1);
+    auto& [x1,y1] = *it;
+    return y0 + (rpm-x0) * (y1-y0) / (x1-x0);
+}

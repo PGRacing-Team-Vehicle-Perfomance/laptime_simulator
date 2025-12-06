@@ -1,12 +1,11 @@
 #include "simulation/skidpad.h"
 
 #include <cmath>
-#include <cstdio>
 #include <numbers>
 
-SkidPad::SkidPad(Vehicle &vehicle, SimConfig simConfig, SimulationConstants simulationConstants, SkidPadConfig skidPadConfig) : trackConfig(skidPadConfig), Simulation(vehicle, simConfig, simulationConstants)
+SkidPad::SkidPad(Vehicle &vehicle, SimConfig simConfig, SimulationConstants simulationConstants, SkidPadConfig skidPadConfig) : skidPadConfig(skidPadConfig), Simulation(vehicle, simConfig, simulationConstants)
 {
-    diameter = trackConfig.minDiameter + trackConfig.diameterOffset;
+    diameter = skidPadConfig.minDiameter + skidPadConfig.diameterOffset;
     radius = diameter / 2;
     trackLength = 2 * std::numbers::pi_v<float> * radius;
 }
@@ -39,5 +38,10 @@ float SkidPad::run()
 
 float SkidPad::calculatePoints(float time, const PointsConfig &pointsConfig) const
 {
-    return Simulation::calculatePoints(time, pointsConfig.historicalBestTime * 1.25, pointsConfig.historicalPMax, pointsConfig.pointsCoefficients);
+    float a = pointsConfig.pointsCoefficients[0];
+    float b = pointsConfig.pointsCoefficients[1];
+    float c = pointsConfig.pointsCoefficients[2];
+    float pMax = pointsConfig.historicalPMax;
+    float tMax = pointsConfig.historicalBestTime * 1.25;
+    return a * pMax * (std::pow(tMax / time, 2) - 1) / b + c * pMax;
 }
