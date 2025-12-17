@@ -1,4 +1,4 @@
-# Global Formula Recing Simulator
+# Global Formula Racing Simulator
 
 Vehicle dynamics simulator for Formula Student competition analysis on Skidpad and Acceleration events.
 
@@ -28,9 +28,9 @@ cmake --build .
 git clone https://github.com/Grochman/gfr_sim.git
 ```
 
-- Open VisualStudio
-- Click File -> Open -> CMake and select the top level CMakeList.txt
-- If you do not have install "Linux, Max, and embedded development with C++" (most likely you will be propted by the IDE to do so, if not go to VisualStudio Installer and download the package manually)
+- Open Visual Studio
+- Click File -> Open -> CMake and select the top level CMakeLists.txt
+- If you do not have it, install "Linux, macOS, and embedded development with C++" (most likely you will be prompted by the IDE to do so, if not go to Visual Studio Installer and download the package manually)
 
 ## Contributing
 
@@ -49,5 +49,5 @@ pip install pre-commit
 or on WSL:
 
 ```bash
-sudo apt get pre-commit
+sudo apt install pre-commit
 ```
