@@ -2,34 +2,28 @@
 
 #include <cmath>
 
-Acceleration::Acceleration(Vehicle &vehicle, SimConfig simConfig, SimulationConstants simulationConstants, AccelerationConfig dragConfig) : dragConfig(dragConfig), Simulation(vehicle, simConfig, simulationConstants)
-{
+Acceleration::Acceleration(Vehicle& vehicle, SimConfig simConfig,
+                           SimulationConstants simulationConstants, AccelerationConfig dragConfig)
+    : dragConfig(dragConfig), Simulation(vehicle, simConfig, simulationConstants) {
     currentGear = 0;
     isShifting = false;
     shiftEndTime = 0.0;
 }
 
-float Acceleration::run()
-{
+float Acceleration::run() {
     float pos = 0, vel = dragConfig.startSpeed, time = 0, prevAcc = 0.0, acc = 0;
 
-    while (pos < dragConfig.length)
-    {
+    while (pos < dragConfig.length) {
         float currentTime = time + simConfig.dragDt;
 
-        if (isShifting)
-        {
+        if (isShifting) {
             acc = 0.0;
-            if (currentTime >= shiftEndTime)
-            {
+            if (currentTime >= shiftEndTime) {
                 isShifting = false;
             }
-        }
-        else
-        {
+        } else {
             float rpm = vehicle.speedToRpm(vel, currentGear);
-            if (rpm >= vehicle.getMaxTorqueRpm() && currentGear < vehicle.getGearCount() - 1)
-            {
+            if (rpm >= vehicle.getMaxTorqueRpm() && currentGear < vehicle.getGearCount() - 1) {
                 currentGear += 1;
                 isShifting = true;
                 shiftEndTime = currentTime + vehicle.getShiftTime();
@@ -43,28 +37,27 @@ float Acceleration::run()
 
             // Initial guess for acc (previous for stability)
             float accGuess = prevAcc;
-            for (int i = 0; i < simConfig.maxIterConv; i++)
-            {
+            for (int i = 0; i < simConfig.maxIterConv; i++) {
                 // Compute traction using current guess for load transfer
                 float tractionMax = vehicle.getTireForces(vel, accGuess, simConfig, false);
+
                 float thrust = std::min(powerThrust, tractionMax);
                 float accNew = (thrust - dragForce - rrForce) / vehicle.getMass();
 
                 // Check convergence
-                if (std::abs(accNew - accGuess) < simConfig.errDelta)
-                {
+                if (std::abs(accNew - accGuess) < simConfig.errDelta) {
                     break;
                 }
-                accGuess = accNew; // Relax to new value (or use acc_guess = 0.5 * acc_guess + 0.5 * acc_new for damping)
+                accGuess = accNew;  // Relax to new value (or use acc_guess = 0.5 * acc_guess + 0.5
+                                    // * acc_new for damping)
             }
-            acc = accGuess; // Use converged value
+            acc = accGuess;  // Use converged value
         }
         vel += acc * simConfig.dragDt;
         pos += vel * simConfig.dragDt;
         time = currentTime;
-        prevAcc = acc; // Still update prev_acc for next step's initial guess
-        if (time > simulationConstants.dragTimeout)
-        {
+        prevAcc = acc;  // Still update prev_acc for next step's initial guess
+        if (time > simulationConstants.dragTimeout) {
             return -1;
         }
     }
@@ -72,8 +65,7 @@ float Acceleration::run()
     return time;
 }
 
-float Acceleration::calculatePoints(float time, const PointsConfig &pointsConfig) const
-{
+float Acceleration::calculatePoints(float time, const PointsConfig& pointsConfig) const {
     float a = pointsConfig.pointsCoefficients[0];
     float b = pointsConfig.pointsCoefficients[1];
     float c = pointsConfig.pointsCoefficients[2];

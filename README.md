@@ -1,8 +1,8 @@
 # Global Formula Recing Simulator
 
-Vehicle dynamics simulator for Formula Student competition analysis on Skidpad and Acceleration events. 
+Vehicle dynamics simulator for Formula Student competition analysis on Skidpad and Acceleration events.
 
-Based on: https://github.com/BAAdas/lap-doer
+Based on: <https://github.com/BAAdas/lap-doer>
 
 ## Requirements
 
@@ -12,6 +12,7 @@ Based on: https://github.com/BAAdas/lap-doer
 ## Building
 
 ### Linux / WSL
+
 ```bash
 git clone https://github.com/Grochman/gfr_sim.git
 cd gfr_sim
@@ -22,9 +23,31 @@ cmake --build .
 ```
 
 ### Windows
+
 ```bash
 git clone https://github.com/Grochman/gfr_sim.git
 ```
+
 - Open VisualStudio
 - Click File -> Open -> CMake and select the top level CMakeList.txt
 - If you do not have install "Linux, Max, and embedded development with C++" (most likely you will be propted by the IDE to do so, if not go to VisualStudio Installer and download the package manually)
+
+## Contributing
+
+After cloning repository run:
+
+```bash
+pre-commit install
+```
+
+to enforce correct code formatting before every commit. If you do not have pre-commit run:
+
+```bash
+pip install pre-commit
+```
+
+or on WSL:
+
+```bash
+sudo apt get pre-commit
+```
