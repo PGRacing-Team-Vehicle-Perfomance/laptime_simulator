@@ -7,6 +7,7 @@ template <typename T>
 struct vec2 {
     T x;
     T y;
+    T length() { return std::sqrt(x * x + y * y); }
 };
 
 struct CarAcronyms {
