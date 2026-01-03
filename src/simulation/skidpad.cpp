@@ -16,22 +16,20 @@ float SkidPad::run() {
     vec2<float> acceleration = {0, static_cast<float>(std::pow(simConfig.startSpeed, 2) / radius)};
     float maxIterations = simulationConstants.trackMaxIterations;
     float minIterations = simulationConstants.trackMinIterations;
+    float speed = 100;
 
-    for (int i = 0; i < maxIterations; i++) {
-        float forces = vehicle.getTireForces(simConfig.startSpeed, acceleration, simConfig);
-        vec2<float> newAcc = {0, forces / vehicle.getTotalMass()};
-        float newVelocity = std::sqrt(newAcc.y * radius);
-        float newLapTime = trackLength / newVelocity;
-
-        if (i >= minIterations && abs(newLapTime - lapTime) <= simConfig.errDelta) {
-            break;
+    for (int steeringAngle = 0; steeringAngle < 90; steeringAngle++) {
+        vehicle.setSteeringAngle(steeringAngle);
+        for (int chassisSlipAngle = 0; chassisSlipAngle < 90; chassisSlipAngle++) {
+            vehicle.setChassisSlipAngle(chassisSlipAngle);
+            vec2<float> diagramPoint = vehicle.getLatAccAndYawMoment(speed);
+            // store diagram point as {latAcc, moment, chassisSlipAngle, steeringAngle}
         }
-
-        lapTime = newLapTime;
-        acceleration = newAcc;
     }
-
-    return lapTime;
+    // plot points
+    //  get max data point
+    //  calculate time based on data point
+    //  return time
 }
 
 float SkidPad::calculatePoints(float time, const PointsConfig& pointsConfig) const {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/config.h"
+#include "vehicle/aeroElement.h"
 #include "vehicle/body.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
@@ -45,7 +46,6 @@ class Vehicle {
     float wheelbase = 1.53;
 
     VehicleConfig config;
-    CarWheelBase<std::unique_ptr<Tire>> tires;
 
     CarWheelBase<float> distributeForces(float totalForce, float frontDist, float leftDist);
     CarWheelBase<float> totalTireLoads(float velocity, vec2<float> acceleration,
