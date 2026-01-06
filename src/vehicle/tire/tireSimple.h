@@ -8,6 +8,7 @@ class TireSimple : public Tire {
    public:
     TireSimple() = default;
     TireSimple(float scalingFactor, float quadFac, float linFac, bool isDriven);
-    float getLateralForce(float verticalLoad) override;
+    float getLateralForce(float verticalLoad, float slipAngle) override;
     float getLongitudinalForce(float verticalLoad) override;
+    float getLateralMoment(float verticalLoad, float slipAngle) override;
 };

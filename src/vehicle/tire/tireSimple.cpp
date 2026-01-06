@@ -16,4 +16,8 @@ float TireSimple::getLongitudinalForce(float verticalLoad) {
     return calculateForce(verticalLoad, false);
 }
 
-float TireSimple::getLateralForce(float verticalLoad) { return calculateForce(verticalLoad, true); }
+float TireSimple::getLateralForce(float verticalLoad, float slipAngle) {
+    return calculateForce(verticalLoad, true);
+}
+
+float TireSimple::getLateralMoment(float verticalLoad, float slipAngle) { return 0; }
