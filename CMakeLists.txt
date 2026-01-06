@@ -10,10 +10,7 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/vehicle/vehicle.cpp
     src/simulation/skidpad.cpp
-    src/simulation/acceleration.cpp
-    src/simulation/simulation.cpp
     src/vehicle/tire/tireSimple.cpp
-    src/vehicle/tire/tireV2.cpp
 )
 
 target_include_directories(gfr_sim PRIVATE src)

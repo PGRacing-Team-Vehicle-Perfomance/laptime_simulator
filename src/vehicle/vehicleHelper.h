@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cwchar>
 #include <memory>
 
@@ -7,13 +8,22 @@ template <typename T>
 struct vec2 {
     T x;
     T y;
-    T length() { return std::sqrt(x * x + y * y); }
+};
+
+template <typename T>
+struct vec3 {
+    T x;
+    T y;
+    T z;
+};
+
+struct Body {
+    float mass;
+    vec3<float> position;
 };
 
 struct CarAcronyms {
     static constexpr unsigned int WHEEL_COUNT = 4;
-
-    enum DriveType : size_t { AWD, RWD, FWD };
 
     enum wheelNames : size_t { FL, FR, RL, RR };
 };

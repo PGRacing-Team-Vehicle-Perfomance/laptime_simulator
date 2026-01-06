@@ -2,31 +2,13 @@
 #include <iostream>
 
 #include "config/config.h"
-#include "simulation/acceleration.h"
 #include "simulation/skidpad.h"
 #include "vehicle/vehicle.h"
 
 int main() {
     VehicleConfig vc;
-    SimConfig sc;
-    SkidPadConfig skidPadConfig;
-    SimulationConstants simulationConstants;
-    PointsConfig pointsConfig;
+    EnvironmentConfig config;
 
     Vehicle v(vc);
-
-    SkidPad s(v, sc, simulationConstants, skidPadConfig);
-    float lapTime = s.run();
-    float points = s.calculatePoints(lapTime, pointsConfig);
-    printf("skidpad time: %f\npoints: %f\n", lapTime, points);
-
-    AccelerationConfig accelerationConfig;
-
-    Acceleration a(v, sc, simulationConstants, accelerationConfig);
-    lapTime = a.run();
-
-    pointsConfig.historicalBestTime = 4.23;
-    pointsConfig.historicalPMax = 73;
-    points = a.calculatePoints(lapTime, pointsConfig);
-    printf("acc time: %f\npoints: %f\n", lapTime, points);
+    v.calculateYawMomentDiagram(100, 1, config);
 }
