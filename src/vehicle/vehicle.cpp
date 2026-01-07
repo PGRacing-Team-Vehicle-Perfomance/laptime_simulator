@@ -66,7 +66,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
     CarWheelBase<float> slipAngles;
     float latAcc = 0;
     float r = 0;
-    float error = 2 * tolerance;
+    float error;
 
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
@@ -74,6 +74,8 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
 
         for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
             tireForcesY[i] = tires[i]->getLateralForce(loads[i], slipAngles[i]);
+            // recalculate for forces relative to chassis or speed vector?
+            // tire longitudinal forces with slip ratio = 0
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesY);
@@ -89,6 +91,9 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
         mz += tireMomentsY[i] = tires[i]->getLateralMoment(loads[i], slipAngles[i]);
     }
 
+    // recalculate for forces relative to chassis
+    // same for x moments
+    // aero yaw moment
     float yawMoment =
         ((tireForcesY[CarAcronyms::FL] + tireForcesY[CarAcronyms::FR]) *
          combinedTotalMass.position.x) -
@@ -137,6 +142,9 @@ CarWheelBase<float> Vehicle::totalTireLoads(float speed, float latAcc,
 }
 
 CarWheelBase<float> Vehicle::staticLoad(float earthAcc) {
+    // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
+    // center here we can fix it by providing 4 masses - on each wheel instead of mass center in
+    // vehicle config
     return distributeForces(combinedTotalMass.mass * earthAcc, combinedTotalMass.position.x,
                             combinedTotalMass.position.y);
 }
@@ -155,6 +163,8 @@ CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist,
 }
 
 CarWheelBase<float> Vehicle::aeroLoad(float velocity, float airDensity) {
+    // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
+    // center
     float totalForce = 0.5 * cla * airDensity * std::pow(velocity, 2);
     return distributeForces(totalForce, claPosition.x, claPosition.y);
 }
