@@ -122,10 +122,11 @@ CarWheelBase<float> Vehicle::calculateSlipAngles(float r, vec2<float> velocity) 
 
 float Vehicle::calculateLatAcc(CarWheelBase<float> tireForcesY) {
     float latAcc = 0;
+    float latForce = 0;
     for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
-        latAcc += tireForcesY[i];
+        latForce += tireForcesY[i];
     }
-    latAcc /= combinedTotalMass.mass;
+    latAcc = latForce / combinedTotalMass.mass;
     return latAcc;
 }
 
