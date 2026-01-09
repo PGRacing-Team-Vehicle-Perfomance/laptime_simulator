@@ -1,10 +1,18 @@
 #pragma once
 
+#include <cmath>
+
+#include "config/configHelper.cpp"
 #include "vehicle/vehicleHelper.h"
 
 struct EnvironmentConfig {
-    float airDensity = 1.25;
-    float earthAcc = 9.81;
+    float airTemperature = 20;                                                // [°C]
+    float airPressure = 100;                                                  // [kPa]
+    float airHumidity = NAN;                                                  // [%]
+    float airDensity = AirDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
+    float earthAcc = 9.81;                                                    // [m/s²]
+    float windSpeed = 0;                                                      // [m/s]
+    float windAngle = 0;                                                      // [°] 0 = head on
 };
 
 struct VehicleConfig {

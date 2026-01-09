@@ -3,6 +3,7 @@
 #include <array>
 #include <cwchar>
 #include <memory>
+#include <optional>
 
 template <typename T>
 struct vec2 {
@@ -15,6 +16,16 @@ struct vec3 {
     T x;
     T y;
     T z;
+};
+
+struct vecAmp3 {
+    vec3<float> position;
+    float amplitude;
+};
+
+struct dim3Loads {
+    vec3<vecAmp3> force;
+    vec3<float> torque;
 };
 
 struct Body {
