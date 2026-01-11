@@ -36,6 +36,7 @@ class Vehicle {
     CarWheelBase<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
     CarWheelBase<float> aeroLoad(float airDensity);
     CarWheelBase<float> loadTransfer(float latAcc);
+    vehicleState springing(dim3Loads Loads);
 
    public:
     vehicleState* getState();
