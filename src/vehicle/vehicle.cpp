@@ -80,6 +80,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
         state.angular_velocity.z = latAcc / velocity.x;
 
         loads = totalTireLoads(latAcc, environmentConfig);
+        springing(dim3Loads());
     } while (error > tolerance);
 
     float mz = 0;
@@ -148,6 +149,8 @@ CarWheelBase<float> Vehicle::staticLoad(float earthAcc) {
     return distributeForces(combinedTotalMass.mass * earthAcc, combinedTotalMass.position.x,
                             combinedTotalMass.position.y);
 }
+
+vehicleState Vehicle::springing(CarWheelBase<float> loads) { return state; }
 
 CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist) {
     CarWheelBase<float> forces;
