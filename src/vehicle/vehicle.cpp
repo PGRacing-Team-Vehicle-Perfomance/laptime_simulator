@@ -22,9 +22,7 @@ Vehicle::Vehicle(const VehicleConfig& config)
       frontTrackWidth(config.frontTrackWidth),
       rearTrackWidth(config.rearTrackWidth),
       trackDistance(config.trackDistance),
-      aero(config),
-      steeringAngle(0),
-      chassisSlipAngle(0) {
+      aero(config) {
     for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
         tires[i] = std::make_unique<TireSimple>(0, 0, 0, false);
     }
@@ -43,34 +41,32 @@ Vehicle::Vehicle(const VehicleConfig& config)
 void Vehicle::calculateYawMomentDiagram(float tolerance,
                                         const EnvironmentConfig& environmentConfig) {
     for (int i = 0; i < 90; i++) {
-        steeringAngle = i;
+        state.steeringAngle = i;
         for (int j = 0; j < 90; j++) {
-            chassisSlipAngle = j;
+            state.rotation.z = j;
             vec2<float> diagramPoint = getLatAccAndYawMoment(tolerance, environmentConfig);
             printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n",
-                   steeringAngle, chassisSlipAngle, diagramPoint.x, diagramPoint.y);
+                   state.steeringAngle, state.rotation.z.get(), diagramPoint.x, diagramPoint.y);
         }
     }
 }
 
 vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
                                            const EnvironmentConfig& environmentConfig) {
-    float beta = chassisSlipAngle;
-
+    Angle beta = state.rotation.z;
     vec2<float> velocity;
-    velocity.x = state.velocity.amplitude * std::sqrt(1 + beta * beta) / (1 + beta * beta);
-    velocity.y = velocity.x * beta;
+    velocity.x = state.velocity.amplitude * std::cos(beta.get());
+    velocity.y = state.velocity.amplitude * std::sin(beta.get());
 
     CarWheelBase<float> tireForcesY;
     CarWheelBase<float> tireMomentsY;
     CarWheelBase<float> slipAngles;
     float latAcc = 0;
-    float r = 0;
     float error;
 
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
-        slipAngles = calculateSlipAngles(r, velocity);
+        slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
 
         for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
             tireForcesY[i] = tires[i]->getLateralForce(loads[i], slipAngles[i]);
@@ -81,7 +77,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
         auto newLatAcc = calculateLatAcc(tireForcesY);
         error = std::abs(latAcc - newLatAcc);
         latAcc = newLatAcc;  // can be different -> latAcc = f(error) 391
-        r = latAcc / velocity.x;
+        state.angular_velocity.z = latAcc / velocity.x;
 
         loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance);
@@ -113,9 +109,9 @@ CarWheelBase<float> Vehicle::calculateSlipAngles(float r, vec2<float> velocity) 
     CarWheelBase<float> slipAngle;
 
     slipAngle[CarAcronyms::FL] =
-        (velocity.x + r * a) / velocity.x - r * frontTrackWidth / 2 - steeringAngle;
+        (velocity.x + r * a) / velocity.x - r * frontTrackWidth / 2 - state.steeringAngle;
     slipAngle[CarAcronyms::FR] =
-        (velocity.x + r * a) / velocity.x + r * frontTrackWidth / 2 - steeringAngle;
+        (velocity.x + r * a) / velocity.x + r * frontTrackWidth / 2 - state.steeringAngle;
     slipAngle[CarAcronyms::RL] = (velocity.x - r * b) / velocity.x - r * rearTrackWidth / 2;
     slipAngle[CarAcronyms::RR] = (velocity.x - r * b) / velocity.x + r * rearTrackWidth / 2;
 

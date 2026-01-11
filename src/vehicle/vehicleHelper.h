@@ -3,7 +3,6 @@
 #include <array>
 #include <cmath>
 #include <cwchar>
-#include <memory>
 #include <optional>
 
 class Angle {
@@ -18,7 +17,6 @@ class Angle {
     constexpr Angle(float v = 0) : value_(normalize(v)) {}
     constexpr float get() const { return value_; }
 
-    // Podstawowe operacje
     Angle operator+(float rhs) const { return Angle(value_ + rhs); }
     Angle operator-(float rhs) const { return Angle(value_ - rhs); }
 
@@ -81,7 +79,8 @@ struct CarWheelBase {
 };
 
 struct vehicleState {
-    float heve = 0;
+    float deltaHeave = 0;
+    float steeringAngle = 0;
     polarVector velocity = {0, Angle(0)};
     vec3<float> angular_velocity = {0, 0, 0};
     vec3<Angle> rotation = {Angle(0), Angle(0), Angle(0)};

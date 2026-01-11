@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 
 #include "config/config.h"
@@ -26,9 +27,6 @@ class Vehicle {
     Aero aero;
 
     CarWheelBase<std::unique_ptr<Tire>> tires;
-
-    float steeringAngle;
-    float chassisSlipAngle;
 
     vec2<float> getLatAccAndYawMoment(float tolerance, const EnvironmentConfig& environmentConfig);
     CarWheelBase<float> calculateSlipAngles(float r, vec2<float> velocity);

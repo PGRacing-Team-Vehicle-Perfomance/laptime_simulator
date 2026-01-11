@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cmath>
+#include <optional>
 
 #include "config/configHelper.cpp"
 #include "vehicle/vehicleHelper.h"
@@ -8,7 +8,7 @@
 struct EnvironmentConfig {
     float airTemperature = 20;                                                // [°C]
     float airPressure = 100;                                                  // [kPa]
-    float airHumidity = NAN;                                                  // [%]
+    std::optional<float> airHumidity = std::nullopt;                          // [%]
     float airDensity = AirDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                    // [m/s²]
     polarVector wind = {.amplitude = 0,
