@@ -1,9 +1,36 @@
 #pragma once
 
 #include <array>
+#include <cmath>
 #include <cwchar>
 #include <memory>
 #include <optional>
+
+class Angle {
+    float value_;
+
+    static constexpr float normalize(double v) {
+        v = std::fmod(v, 360.0);
+        return v < 0 ? v + 360.0 : v;
+    }
+
+   public:
+    constexpr Angle(float v = 0) : value_(normalize(v)) {}
+    constexpr float get() const { return value_; }
+
+    // Podstawowe operacje
+    Angle operator+(float rhs) const { return Angle(value_ + rhs); }
+    Angle operator-(float rhs) const { return Angle(value_ - rhs); }
+
+    Angle& operator+=(float rhs) {
+        value_ = normalize(value_ + rhs);
+        return *this;
+    }
+    Angle& operator-=(float rhs) {
+        value_ = normalize(value_ - rhs);
+        return *this;
+    }
+};
 
 template <typename T>
 struct vec2 {
@@ -18,8 +45,13 @@ struct vec3 {
     T z;
 };
 
+struct polarVector {
+    float amplitude;
+    Angle angle;
+};
+
 struct vecAmp3 {
-    vec3<float> position;
+    vec3<float> origin;
     float amplitude;
 };
 
@@ -46,4 +78,12 @@ struct CarWheelBase {
     const T& operator[](size_t i) const { return _data[i]; }
 
     std::array<T, CarAcronyms::WHEEL_COUNT> _data;
+};
+
+struct vehicleState {
+    float heve = 0;
+    polarVector velocity = {0, Angle(0)};
+    vec3<float> angular_velocity = {0, 0, 0};
+    vec3<Angle> rotation = {Angle(0), Angle(0), Angle(0)};
+    std::optional<vec3<float>> position = std::nullopt;
 };

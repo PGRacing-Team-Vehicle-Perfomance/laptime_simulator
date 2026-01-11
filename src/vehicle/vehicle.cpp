@@ -7,6 +7,7 @@
 #include <numbers>
 
 #include "config/config.h"
+#include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/tire/tireSimple.h"
 #include "vehicle/vehicleHelper.h"
@@ -21,8 +22,7 @@ Vehicle::Vehicle(const VehicleConfig& config)
       frontTrackWidth(config.frontTrackWidth),
       rearTrackWidth(config.rearTrackWidth),
       trackDistance(config.trackDistance),
-      cla(config.cla),
-      claPosition(config.claPosition),
+      aero(config),
       steeringAngle(0),
       chassisSlipAngle(0) {
     for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
@@ -40,25 +40,25 @@ Vehicle::Vehicle(const VehicleConfig& config)
                                       combinedTotalMass.mass};
 }
 
-void Vehicle::calculateYawMomentDiagram(float speed, float tolerance,
+void Vehicle::calculateYawMomentDiagram(float tolerance,
                                         const EnvironmentConfig& environmentConfig) {
     for (int i = 0; i < 90; i++) {
         steeringAngle = i;
         for (int j = 0; j < 90; j++) {
             chassisSlipAngle = j;
-            vec2<float> diagramPoint = getLatAccAndYawMoment(speed, tolerance, environmentConfig);
+            vec2<float> diagramPoint = getLatAccAndYawMoment(tolerance, environmentConfig);
             printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n",
                    steeringAngle, chassisSlipAngle, diagramPoint.x, diagramPoint.y);
         }
     }
 }
 
-vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
+vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
                                            const EnvironmentConfig& environmentConfig) {
     float beta = chassisSlipAngle;
 
     vec2<float> velocity;
-    velocity.x = speed * std::sqrt(1 + beta * beta) / (1 + beta * beta);
+    velocity.x = state.velocity.amplitude * std::sqrt(1 + beta * beta) / (1 + beta * beta);
     velocity.y = velocity.x * beta;
 
     CarWheelBase<float> tireForcesY;
@@ -83,7 +83,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
         latAcc = newLatAcc;  // can be different -> latAcc = f(error) 391
         r = latAcc / velocity.x;
 
-        loads = totalTireLoads(speed, latAcc, environmentConfig);
+        loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance);
 
     float mz = 0;
@@ -103,6 +103,8 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float speed, float tolerance,
         ((tireForcesY[CarAcronyms::FL] + tireForcesY[CarAcronyms::RL]) * frontTrackWidth / 2) + mz;
     return {latAcc, yawMoment};
 }
+
+vehicleState* Vehicle::getState() { return &state; }
 
 CarWheelBase<float> Vehicle::calculateSlipAngles(float r, vec2<float> velocity) {
     float a = combinedTotalMass.position.x;
@@ -130,10 +132,11 @@ float Vehicle::calculateLatAcc(CarWheelBase<float> tireForcesY) {
     return latAcc;
 }
 
-CarWheelBase<float> Vehicle::totalTireLoads(float speed, float latAcc,
+CarWheelBase<float> Vehicle::totalTireLoads(float latAcc,
                                             const EnvironmentConfig& environmentConfig) {
+    getState()->velocity.amplitude = state.velocity.amplitude;
     auto static_load = staticLoad(environmentConfig.earthAcc);
-    auto aero = aeroLoad(speed, environmentConfig.airDensity);
+    auto aero = aeroLoad(environmentConfig.airDensity);
     auto transfer = loadTransfer(latAcc);
     CarWheelBase<float> ret;
     for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
@@ -163,11 +166,12 @@ CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist,
     return forces;
 }
 
-CarWheelBase<float> Vehicle::aeroLoad(float velocity, float airDensity) {
+CarWheelBase<float> Vehicle::aeroLoad(float airDensity) {
     // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
     // center
-    float totalForce = 0.5 * cla * airDensity * std::pow(velocity, 2);
-    return distributeForces(totalForce, claPosition.x, claPosition.y);
+    aero.calculteLoads(state, airDensity);
+    return distributeForces(aero.getLoads().force.z.amplitude, aero.getLoads().force.z.origin.x,
+                            aero.getLoads().force.z.origin.y);
 }
 
 CarWheelBase<float> Vehicle::loadTransfer(float latAcc) {

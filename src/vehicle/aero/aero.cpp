@@ -1,59 +1,50 @@
-#include "vehicle/aero.h"
+#include "vehicle/aero/aero.h"
 
 #include "config/config.h"
 #include "vehicle/vehicleHelper.h"
 
 Aero::Aero(const VehicleConfig& config) : cla(config.cla), claPosition(config.claPosition) {}
 
-dim3Loads Aero::calculteLoads(float velocity, float chassisSlipAngle, float airDensity,
-                              float windSpeed, float windAngleOfAttack) {
-    Torques(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
-    Forces(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
+dim3Loads Aero::calculteLoads(vehicleState state, float airDensity, polarVector wind) {
+    Torques(state, airDensity, wind);
+    Forces(state, airDensity, wind);
 
     return loads;
 }
 dim3Loads Aero::getLoads() { return loads; }
 
-vec3<float> Aero::Torques(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                          float windAngleOfAttack) {
-    YawingTorque(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
-    RollingTorque(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
-    PithingTorque(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
+vec3<float> Aero::Torques(vehicleState state, float airDensity, polarVector wind) {
+    YawingTorque(state, airDensity, wind);
+    RollingTorque(state, airDensity, wind);
+    PithingTorque(state, airDensity, wind);
 
     return loads.torque;
 }
 
-float Aero::YawingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                         float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
-}
-float Aero::RollingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                          float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
-}
-float Aero::PithingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                          float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
-}
+float Aero::YawingTorque(vehicleState state, float airDensity, polarVector wind) { return 0; }
+float Aero::RollingTorque(vehicleState state, float airDensity, polarVector wind) { return 0; }
+float Aero::PithingTorque(vehicleState state, float airDensity, polarVector wind) { return 0; }
 
-vec3<vecAmp3> Aero::Forces(float velocity, float chassisSlipAngle, float airDensity,
-                           float windSpeed, float windAngleOfAttack) {
-    Resistance(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
-    SideForce(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
-    Downforce(velocity, chassisSlipAngle, airDensity, windSpeed, windAngleOfAttack);
+vec3<vecAmp3> Aero::Forces(vehicleState state, float airDensity, polarVector wind) {
+    Resistance(state, airDensity, wind);
+    SideForce(state, airDensity, wind);
+    Downforce(state, airDensity, wind);
 
     return loads.force;
 }
 
-vecAmp3 Aero::Resistance(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                         float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
+vecAmp3 Aero::Resistance(vehicleState state, float airDensity, polarVector wind) {
+    loads.force.x.amplitude = 0;
+    return loads.force.x;
 }
-vecAmp3 Aero::SideForce(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                        float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
+vecAmp3 Aero::SideForce(vehicleState state, float airDensity, polarVector wind) {
+    loads.force.x.amplitude = 0;
+    return loads.force.x;
 }
-vecAmp3 Aero::Downforce(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                        float windAngleOfAttack) {
-    throw std::runtime_error("Not implemented");
+vecAmp3 Aero::Downforce(vehicleState state, float airDensity, polarVector wind) {
+    float totalForce = 0.5 * cla * airDensity * std::pow(state.velocity.amplitude, 2);
+    loads.force.z.amplitude = totalForce;
+    loads.force.z.origin.x = claPosition.x;
+    loads.force.z.origin.y = claPosition.y;
+    return loads.force.z;
 }

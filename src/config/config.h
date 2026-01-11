@@ -11,8 +11,8 @@ struct EnvironmentConfig {
     float airHumidity = NAN;                                                  // [%]
     float airDensity = AirDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                    // [m/s²]
-    float windSpeed = 0;                                                      // [m/s]
-    float windAngle = 0;                                                      // [°] 0 = head on
+    polarVector wind = {.amplitude = 0,
+                        .angle = Angle(0)};  //  amlitude [m/s] , angle [°] 0 = from North
 };
 
 struct VehicleConfig {

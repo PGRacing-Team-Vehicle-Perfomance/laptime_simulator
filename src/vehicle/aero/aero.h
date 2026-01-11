@@ -8,31 +8,23 @@ class Aero {
     vec2<float> claPosition;
     dim3Loads loads;
 
-    // Aero(aeroConfig);
-    vec3<float> Torques(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                        float windAngleOfAttack);
+    vec3<float> Torques(vehicleState state, float airDensity, polarVector wind);
 
-    float YawingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                       float windAngleOfAttack);
-    float RollingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                        float windAngleOfAttack);
-    float PithingTorque(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                        float windAngleOfAttack);
+    float YawingTorque(vehicleState state, float airDensity, polarVector wind);
+    float RollingTorque(vehicleState state, float airDensity, polarVector wind);
+    float PithingTorque(vehicleState state, float airDensity, polarVector wind);
 
-    vec3<vecAmp3> Forces(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                         float windAngleOfAttack);
+    vec3<vecAmp3> Forces(vehicleState state, float airDensity, polarVector wind);
 
-    vecAmp3 Resistance(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                       float windAngleOfAttack);
-    vecAmp3 SideForce(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                      float windAngleOfAttack);
-    vecAmp3 Downforce(float velocity, float chassisSlipAngle, float airDensity, float windSpeed,
-                      float windAngleOfAttack);
+    vecAmp3 Resistance(vehicleState state, float airDensity, polarVector wind);
+    vecAmp3 SideForce(vehicleState state, float airDensity, polarVector wind);
+    vecAmp3 Downforce(vehicleState state, float airDensity, polarVector wind);
 
    public:
+    // Aero(aeroConfig);
     Aero(const VehicleConfig& config);
     Aero() = default;
-    dim3Loads calculteLoads(float velocity, float chassisSlipAngle, float airDensity,
-                            float windSpeed, float windAngleOfAttack);
+    dim3Loads calculteLoads(vehicleState state, float airDensity,
+                            polarVector wind = {.amplitude = 0, .angle = Angle(0)});
     dim3Loads getLoads();
 };
