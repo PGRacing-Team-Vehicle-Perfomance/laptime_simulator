@@ -3,7 +3,8 @@
 #include <cmath>
 #include <optional>
 
-float AirDensity(float airTemperature, float airPressure, std::optional<float> relativeHumidity) {
+inline float AirDensity(float airTemperature, float airPressure,
+                        std::optional<float> relativeHumidity) {
     float humidity = relativeHumidity.value_or(50.0f);
     constexpr float R_DRY = 287.058f;    // specific gas constant for dry air (J/(kg·K))
     constexpr float R_VAPOR = 461.495f;  // specific gas constant for water vapor (J/(kg·K))

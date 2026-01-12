@@ -28,6 +28,8 @@ class Angle {
         value_ = normalize(value_ - rhs);
         return *this;
     }
+
+    float getRadians() { return value_ / 180.0f * M_PI; }
 };
 
 template <typename T>

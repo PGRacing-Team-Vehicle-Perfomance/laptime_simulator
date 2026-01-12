@@ -55,8 +55,8 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
                                            const EnvironmentConfig& environmentConfig) {
     Angle beta = state.rotation.z;
     vec2<float> velocity;
-    velocity.x = state.velocity.amplitude * std::cos(beta.get());
-    velocity.y = state.velocity.amplitude * std::sin(beta.get());
+    velocity.x = state.velocity.amplitude * std::cos(beta.getRadians());
+    velocity.y = state.velocity.amplitude * std::sin(beta.getRadians());
 
     CarWheelBase<float> tireForcesY;
     CarWheelBase<float> tireMomentsY;
@@ -80,7 +80,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
         state.angular_velocity.z = latAcc / velocity.x;
 
         loads = totalTireLoads(latAcc, environmentConfig);
-        springing(dim3Loads());
+        springing(loads);
     } while (error > tolerance);
 
     float mz = 0;
