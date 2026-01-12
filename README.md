@@ -46,7 +46,7 @@ to enforce correct code formatting before every commit. If you do not have pre-c
 pip install pre-commit
 ```
 
-or on WSL:
+or on WSL(Debian based):
 
 ```bash
 sudo apt install pre-commit
