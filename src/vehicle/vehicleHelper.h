@@ -45,9 +45,9 @@ struct vec3 {
     T z;
 };
 
-struct polarVector {
+struct polarVec3 {
     float amplitude;
-    Angle angle;
+    vec2<Angle> angle;
 };
 
 struct vecAmp3 {
@@ -80,11 +80,14 @@ struct CarWheelBase {
     std::array<T, CarAcronyms::WHEEL_COUNT> _data;
 };
 
-struct vehicleState {
+struct State {
+    std::optional<polarVec3> velocity;
+    std::optional<vec3<float>> angular_velocity;
+    std::optional<vec3<Angle>> rotation;
+    std::optional<vec3<float>> position;
+};
+
+struct vehicleState : State {
     float deltaHeave = 0;
     float steeringAngle = 0;
-    polarVector velocity = {0, Angle(0)};
-    vec3<float> angular_velocity = {0, 0, 0};
-    vec3<Angle> rotation = {Angle(0), Angle(0), Angle(0)};
-    std::optional<vec3<float>> position = std::nullopt;
 };

@@ -8,23 +8,23 @@ class Aero {
     vec2<float> claPosition;
     dim3Loads loads;
 
-    vec3<float> Torques(vehicleState state, float airDensity, polarVector wind);
+    vec3<float> torques(vehicleState state, float airDensity, polarVec3 wind);
 
-    float YawingTorque(vehicleState state, float airDensity, polarVector wind);
-    float RollingTorque(vehicleState state, float airDensity, polarVector wind);
-    float PithingTorque(vehicleState state, float airDensity, polarVector wind);
+    float yawingTorque(vehicleState state, float airDensity, polarVec3 wind);
+    float rollingTorque(vehicleState state, float airDensity, polarVec3 wind);
+    float pithingTorque(vehicleState state, float airDensity, polarVec3 wind);
 
-    vec3<vecAmp3> Forces(vehicleState state, float airDensity, polarVector wind);
+    vec3<vecAmp3> forces(vehicleState state, float airDensity, polarVec3 wind);
 
-    vecAmp3 Resistance(vehicleState state, float airDensity, polarVector wind);
-    vecAmp3 SideForce(vehicleState state, float airDensity, polarVector wind);
-    vecAmp3 Downforce(vehicleState state, float airDensity, polarVector wind);
+    vecAmp3 resistance(vehicleState state, float airDensity, polarVec3 wind);
+    vecAmp3 sideForce(vehicleState state, float airDensity, polarVec3 wind);
+    vecAmp3 downforce(vehicleState state, float airDensity, polarVec3 wind);
 
    public:
     // Aero(aeroConfig);
     Aero(const VehicleConfig& config);
     Aero() = default;
     dim3Loads calculteLoads(vehicleState state, float airDensity,
-                            polarVector wind = {.amplitude = 0, .angle = Angle(0)});
+                            polarVec3 wind = {.amplitude = 0, .angle = Angle(0)});
     dim3Loads getLoads();
 };

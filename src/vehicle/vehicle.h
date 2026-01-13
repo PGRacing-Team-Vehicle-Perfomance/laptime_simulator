@@ -7,6 +7,7 @@
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
+
 class Vehicle {
     Body combinedTotalMass;
 

@@ -43,20 +43,20 @@ void Vehicle::calculateYawMomentDiagram(float tolerance,
     for (int i = 0; i < 90; i++) {
         state.steeringAngle = i;
         for (int j = 0; j < 90; j++) {
-            state.rotation.z = j;
+            state.rotation->z = j;
             vec2<float> diagramPoint = getLatAccAndYawMoment(tolerance, environmentConfig);
             printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n",
-                   state.steeringAngle, state.rotation.z.get(), diagramPoint.x, diagramPoint.y);
+                   state.steeringAngle, state.rotation->z.get(), diagramPoint.x, diagramPoint.y);
         }
     }
 }
 
 vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
                                            const EnvironmentConfig& environmentConfig) {
-    Angle beta = state.rotation.z;
+    Angle beta = state.rotation->z;
     vec2<float> velocity;
-    velocity.x = state.velocity.amplitude * std::cos(beta.getRadians());
-    velocity.y = state.velocity.amplitude * std::sin(beta.getRadians());
+    velocity.x = state.velocity->amplitude * std::cos(beta.getRadians());
+    velocity.y = state.velocity->amplitude * std::sin(beta.getRadians());
 
     CarWheelBase<float> tireForcesY;
     CarWheelBase<float> tireMomentsY;
@@ -66,7 +66,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
 
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
-        slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
+        slipAngles = calculateSlipAngles(state.angular_velocity->z, velocity);
 
         for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
             tireForcesY[i] = tires[i]->getLateralForce(loads[i], slipAngles[i]);
@@ -77,7 +77,7 @@ vec2<float> Vehicle::getLatAccAndYawMoment(float tolerance,
         auto newLatAcc = calculateLatAcc(tireForcesY);
         error = std::abs(latAcc - newLatAcc);
         latAcc = newLatAcc;  // can be different -> latAcc = f(error) 391
-        state.angular_velocity.z = latAcc / velocity.x;
+        state.angular_velocity->z = latAcc / velocity.x;
 
         loads = totalTireLoads(latAcc, environmentConfig);
         springing(loads);
@@ -131,7 +131,6 @@ float Vehicle::calculateLatAcc(CarWheelBase<float> tireForcesY) {
 
 CarWheelBase<float> Vehicle::totalTireLoads(float latAcc,
                                             const EnvironmentConfig& environmentConfig) {
-    getState()->velocity.amplitude = state.velocity.amplitude;
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig.airDensity);
     auto transfer = loadTransfer(latAcc);
