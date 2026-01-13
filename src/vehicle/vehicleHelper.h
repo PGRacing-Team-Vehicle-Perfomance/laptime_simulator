@@ -3,8 +3,6 @@
 #include <array>
 #include <cmath>
 #include <cwchar>
-#include <optional>
-
 class Angle {
     float value_;
 
@@ -80,14 +78,17 @@ struct CarWheelBase {
     std::array<T, CarAcronyms::WHEEL_COUNT> _data;
 };
 
-struct State {
-    std::optional<polarVec3> velocity;
-    std::optional<vec3<float>> angular_velocity;
-    std::optional<vec3<Angle>> rotation;
-    std::optional<vec3<float>> position;
+struct RotationalState {
+    vec3<float> angular_velocity = {0, 0, 0};
+    vec3<Angle> rotation = {0, 0, 0};
 };
 
-struct vehicleState : State {
+struct LinearState {
+    polarVec3 velocity = {.amplitude = 0, .angle = {0, 0}};
+    vec3<float> position = {0, 0, 0};
+};
+
+struct vehicleState : LinearState, RotationalState {
     float deltaHeave = 0;
     float steeringAngle = 0;
 };

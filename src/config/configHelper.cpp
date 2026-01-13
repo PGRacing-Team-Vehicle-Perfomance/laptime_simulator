@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cmath>
-#include <optional>
 
 inline float airDensity(float airTemperature = 20, float airPressure = 100,
                         float relativeHumidity = 50) {

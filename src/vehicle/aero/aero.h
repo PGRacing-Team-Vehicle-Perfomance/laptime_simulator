@@ -12,7 +12,7 @@ class Aero {
 
     float yawingTorque(vehicleState state, float airDensity, polarVec3 wind);
     float rollingTorque(vehicleState state, float airDensity, polarVec3 wind);
-    float pithingTorque(vehicleState state, float airDensity, polarVec3 wind);
+    float pitchingTorque(vehicleState state, float airDensity, polarVec3 wind);
 
     vec3<vecAmp3> forces(vehicleState state, float airDensity, polarVec3 wind);
 
@@ -24,7 +24,7 @@ class Aero {
     // Aero(aeroConfig);
     Aero(const VehicleConfig& config);
     Aero() = default;
-    dim3Loads calculteLoads(vehicleState state, float airDensity,
-                            polarVec3 wind = {.amplitude = 0, .angle = Angle(0)});
+    dim3Loads calculateLoads(vehicleState state, float airDensity,
+                             polarVec3 wind = {.amplitude = 0, .angle = Angle(0)});
     dim3Loads getLoads();
 };
