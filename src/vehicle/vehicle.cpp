@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <numbers>
@@ -110,14 +109,12 @@ CarWheelBase<float> Vehicle::calculateSlipAngles(float r, vec2<float> velocity) 
 
     CarWheelBase<float> slipAngle;
 
-    slipAngle[CarAcronyms::FL] = (velocity.x + r * a) / velocity.x - r * frontTrackWidth / 2 -
-                                 ackermann(CarAcronyms::FL) - toe(CarAcronyms::FL);
-    slipAngle[CarAcronyms::FR] = (velocity.x + r * a) / velocity.x + r * frontTrackWidth / 2 -
-                                 ackermann(CarAcronyms::FR) + toe(CarAcronyms::FR);
-    slipAngle[CarAcronyms::RL] =
-        (velocity.x - r * b) / velocity.x - r * rearTrackWidth / 2 - toe(CarAcronyms::RL);
-    slipAngle[CarAcronyms::RR] =
-        (velocity.x - r * b) / velocity.x + r * rearTrackWidth / 2 + toe(CarAcronyms::RR);
+    slipAngle[CarAcronyms::FL] =
+        (velocity.x + r * a) / velocity.x - r * frontTrackWidth / 2 - state.steeringAngle;
+    slipAngle[CarAcronyms::FR] =
+        (velocity.x + r * a) / velocity.x + r * frontTrackWidth / 2 - state.steeringAngle;
+    slipAngle[CarAcronyms::RL] = (velocity.x - r * b) / velocity.x - r * rearTrackWidth / 2;
+    slipAngle[CarAcronyms::RR] = (velocity.x - r * b) / velocity.x + r * rearTrackWidth / 2;
 
     return slipAngle;
 }
@@ -134,7 +131,6 @@ float Vehicle::calculateLatAcc(CarWheelBase<float> tireForcesY) {
 
 CarWheelBase<float> Vehicle::totalTireLoads(float latAcc,
                                             const EnvironmentConfig& environmentConfig) {
-    getState()->velocity.amplitude = state.velocity.amplitude;
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig.airDensity);
     auto transfer = loadTransfer(latAcc);
@@ -155,10 +151,6 @@ CarWheelBase<float> Vehicle::staticLoad(float earthAcc) {
 
 vehicleState Vehicle::springing(CarWheelBase<float> loads) { return state; }
 
-float Vehicle::ackermann(size_t wheel) { return state.steeringAngle; }
-
-float Vehicle::toe(size_t wheel) { return tires[wheel]->getToe(); };
-
 CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist) {
     CarWheelBase<float> forces;
     forces[CarAcronyms::FL] = totalForce * (trackDistance - frontDist) / trackDistance *
@@ -175,7 +167,7 @@ CarWheelBase<float> Vehicle::distributeForces(float totalForce, float frontDist,
 CarWheelBase<float> Vehicle::aeroLoad(float airDensity) {
     // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
     // center
-    aero.calculteLoads(state, airDensity);
+    aero.calculateLoads(state, airDensity);
     return distributeForces(aero.getLoads().force.z.amplitude, aero.getLoads().force.z.origin.x,
                             aero.getLoads().force.z.origin.y);
 }
