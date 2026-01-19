@@ -12,6 +12,8 @@ float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
     return 0;
 }
 
+float TireSimple::getToe() { return toe.get(); }
+
 float TireSimple::getLongitudinalForce(float verticalLoad) {
     return calculateForce(verticalLoad, false);
 }
