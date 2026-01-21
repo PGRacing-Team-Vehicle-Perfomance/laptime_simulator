@@ -3,28 +3,23 @@
 #include "config/config.h"
 #include "vehicle/vehicleHelper.h"
 
-class Aero {
+class Aero: public ReactiveEntity {
     float cla;
-    vec2<float> claPosition;
-    dim3Loads loads;
+    void calculateTorques(VehicleState state, float airDensity, PolarVec3 wind);
 
-    vec3<float> torques(vehicleState state, float airDensity, polarVec3 wind);
+    void yawingTorque(VehicleState state, float airDensity, PolarVec3 wind);
+    void rollingTorque(VehicleState state, float airDensity, PolarVec3 wind);
+    void pitchingTorque(VehicleState state, float airDensity, PolarVec3 wind);
 
-    float yawingTorque(vehicleState state, float airDensity, polarVec3 wind);
-    float rollingTorque(vehicleState state, float airDensity, polarVec3 wind);
-    float pitchingTorque(vehicleState state, float airDensity, polarVec3 wind);
+    void calculateForces(VehicleState state, float airDensity, PolarVec3 wind);
 
-    vec3<vecAmp3> forces(vehicleState state, float airDensity, polarVec3 wind);
-
-    vecAmp3 resistance(vehicleState state, float airDensity, polarVec3 wind);
-    vecAmp3 sideForce(vehicleState state, float airDensity, polarVec3 wind);
-    vecAmp3 downforce(vehicleState state, float airDensity, polarVec3 wind);
+    void resistance(VehicleState state, float airDensity, PolarVec3 wind);
+    void sideForce(VehicleState state, float airDensity, PolarVec3 wind);
+    void downforce(VehicleState state, float airDensity, PolarVec3 wind);
 
    public:
-    // Aero(aeroConfig);
     Aero(const VehicleConfig& config);
     Aero() = default;
-    dim3Loads calculateLoads(vehicleState state, float airDensity,
-                             polarVec3 wind = {.amplitude = 0, .angle = Angle(0)});
-    dim3Loads getLoads();
+    void calculate(VehicleState state, float airDensity,
+                             PolarVec3 wind = {.amplitude = 0, .alfa = 0, .ro = 0});
 };

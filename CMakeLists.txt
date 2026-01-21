@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(gfr_sim LANGUAGES CXX)
+project(laptime_simulator LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -16,4 +16,4 @@ add_executable(${PROJECT_NAME}
     src/vehicle/tire/tireSimple.cpp
 )
 
-target_include_directories(gfr_sim PRIVATE src)
+target_include_directories(laptime_simulator PRIVATE src)

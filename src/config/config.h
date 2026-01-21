@@ -9,8 +9,8 @@ struct EnvironmentConfig {
     float airHumidity = 50;                                                     // [%]
     float airDensity = ::airDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                      // [m/s²]
-    polarVec3 wind = {.amplitude = 0,
-                      .angle = {0, 0}};  //  amplitude [m/s] , angle [°] 0 = from North
+    PolarVec3 wind = {.amplitude = 0,
+                      .alfa =0, .ro= 0};  //  amplitude [m/s] , angle [°] 0 = from North
 };
 
 struct VehicleConfig {
@@ -29,7 +29,13 @@ struct VehicleConfig {
     float trackDistance = 2;
 
     float cla = 4.3;
-    vec2<float> claPosition = {0.5, 0.5};
+    Vec3<float> claPosition = {0.5, 0.5, 0.0};
+};
+
+struct TireConfig {
+    float scalingFac;
+    float quadFac;
+    float linFac;
 };
 
 struct SkidPadConfig {

@@ -1,6 +1,9 @@
 #pragma once
 
-class Tire {
+#include "vehicle/vehicleHelper.h"
+#include "config/config.h"
+
+class Tire: public ReactiveEntity {
    protected:
     float scalingFactor;
     float quadFac;
@@ -9,9 +12,7 @@ class Tire {
 
    public:
     Tire() = default;
-    Tire(float scalingFactor, float quadFac, float linFac, bool isDriven)
-        : scalingFactor(scalingFactor), quadFac(quadFac), linFac(linFac), isDriven(isDriven) {}
-    virtual float getLateralForce(float verticalLoad, float slipAngle) = 0;
-    virtual float getLongitudinalForce(float verticalLoad) = 0;
-    virtual float getLateralMoment(float verticalLoad, float slipAngle) = 0;
+    Tire(const TireConfig& config, bool isDriven)
+        : scalingFactor(config.scalingFac), quadFac(config.quadFac), linFac(config.linFac), isDriven(isDriven) {}
+    virtual void calculate(float verticalLoad, float slipAngle, float slipRatio) = 0;
 };

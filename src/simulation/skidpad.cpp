@@ -7,5 +7,4 @@ SkidPad::SkidPad(const VehicleConfig& vehicleConfig, const SkidPadConfig& skidPa
       diameter(skidPadConfig.diameter),
       airDensity(environmentConfig.airDensity),
       earthAcc(environmentConfig.earthAcc) {
-    this->vehicle = Vehicle(vehicleConfig);
 }

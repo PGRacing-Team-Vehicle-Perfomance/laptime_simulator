@@ -23,25 +23,26 @@ class Vehicle {
     float frontTrackWidth;
     float rearTrackWidth;
     float trackDistance;
-    vehicleState state;
+    VehicleState state;
 
     Aero aero;
 
-    CarWheelBase<std::unique_ptr<Tire>> tires;
+    WheelData<std::unique_ptr<Tire>> tires;
 
-    vec2<float> getLatAccAndYawMoment(float tolerance, const EnvironmentConfig& environmentConfig);
-    CarWheelBase<float> calculateSlipAngles(float r, vec2<float> velocity);
-    CarWheelBase<float> staticLoad(float earthAcc);
-    float calculateLatAcc(CarWheelBase<float> tireForcesY);
-    CarWheelBase<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    CarWheelBase<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
-    CarWheelBase<float> aeroLoad(float airDensity);
-    CarWheelBase<float> loadTransfer(float latAcc);
-    vehicleState springing(CarWheelBase<float> loads);
+    std::array<float, 2> getLatAccAndYawMoment(float tolerance,
+                                               const EnvironmentConfig& environmentConfig);
+    WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
+    WheelData<float> staticLoad(float earthAcc);
+    float calculateLatAcc(WheelData<float> tireForcesY);
+    WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
+    WheelData<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
+    WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
+    WheelData<float> loadTransfer(float latAcc);
+    VehicleState springing(WheelData<float> loads);
 
    public:
-    vehicleState* getState();
-    Vehicle(const VehicleConfig& config);
+    VehicleState* getState();
+    Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
     void calculateYawMomentDiagram(float tolerance, const EnvironmentConfig& environmentConfig);
 };

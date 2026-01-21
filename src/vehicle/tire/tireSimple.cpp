@@ -1,9 +1,10 @@
 #include "vehicle/tire/tireSimple.h"
+#include "config/config.h"
 
 #include <cmath>
 
-TireSimple::TireSimple(float scalingFactor, float quadFac, float linFac, bool isDriven)
-    : Tire(scalingFactor, quadFac, linFac, isDriven) {}
+TireSimple::TireSimple(const TireConfig& config, bool isDriven)
+    : Tire(config, isDriven) {}
 
 float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
     if (isDriven || isLateral) {
@@ -12,12 +13,7 @@ float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
     return 0;
 }
 
-float TireSimple::getLongitudinalForce(float verticalLoad) {
-    return calculateForce(verticalLoad, false);
+void TireSimple::calculate(float verticalLoad, float slipAngle, float slipRatio) {
+    force.y = calculateForce(verticalLoad, true);
+    force.y = calculateForce(verticalLoad, false);
 }
-
-float TireSimple::getLateralForce(float verticalLoad, float slipAngle) {
-    return calculateForce(verticalLoad, true);
-}
-
-float TireSimple::getLateralMoment(float verticalLoad, float slipAngle) { return 0; }

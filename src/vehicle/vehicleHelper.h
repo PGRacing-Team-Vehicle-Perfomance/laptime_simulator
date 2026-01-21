@@ -3,64 +3,64 @@
 #include <array>
 #include <cmath>
 #include <cwchar>
-class Angle {
-    float value_;
 
-    static constexpr float normalize(double v) {
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+
+class Angle {
+    float value;
+
+    static float normalize(double v) {
         v = std::fmod(v, 360.0);
         return v < 0 ? v + 360.0 : v;
     }
 
    public:
-    constexpr Angle(float v = 0) : value_(normalize(v)) {}
-    constexpr float get() const { return value_; }
+    Angle(float v = 0) : value(normalize(v)) {}
+    float get() const { return value; }
 
-    Angle operator+(float rhs) const { return Angle(value_ + rhs); }
-    Angle operator-(float rhs) const { return Angle(value_ - rhs); }
+    Angle operator+(float rhs) const { return Angle(value + rhs); }
+    Angle operator-(float rhs) const { return Angle(value - rhs); }
 
     Angle& operator+=(float rhs) {
-        value_ = normalize(value_ + rhs);
+        value = normalize(value + rhs);
         return *this;
     }
     Angle& operator-=(float rhs) {
-        value_ = normalize(value_ - rhs);
+        value = normalize(value - rhs);
         return *this;
     }
 
-    float getRadians() { return value_ / 180.0f * M_PI; }
+    float getRadians() { return value / 180.0f * M_PI; }
 };
 
 template <typename T>
-struct vec2 {
-    T x;
-    T y;
-};
-
-template <typename T>
-struct vec3 {
+struct Vec3 {
     T x;
     T y;
     T z;
 };
 
-struct polarVec3 {
+struct PolarVec3 {
     float amplitude;
-    vec2<Angle> angle;
+    Angle alfa;
+    Angle ro;
 };
 
-struct vecAmp3 {
-    vec3<float> origin;
+struct VecAmp3 {
+    Vec3<float> origin;
     float amplitude;
 };
 
-struct dim3Loads {
-    vec3<vecAmp3> force;
-    vec3<float> torque;
+struct Dim3Loads {
+    Vec3<VecAmp3> force;
+    Vec3<float> torque;
 };
 
 struct Body {
     float mass;
-    vec3<float> position;
+    Vec3<float> position;
 };
 
 struct CarAcronyms {
@@ -70,7 +70,7 @@ struct CarAcronyms {
 };
 
 template <typename T>
-struct CarWheelBase {
+struct WheelData {
     T& operator[](size_t i) { return _data[i]; }
 
     const T& operator[](size_t i) const { return _data[i]; }
@@ -79,16 +79,29 @@ struct CarWheelBase {
 };
 
 struct RotationalState {
-    vec3<float> angular_velocity = {0, 0, 0};
-    vec3<Angle> rotation = {0, 0, 0};
+    Vec3<float> angular_velocity = {0, 0, 0};
+    Vec3<Angle> rotation = {0, 0, 0};
 };
 
 struct LinearState {
-    polarVec3 velocity = {.amplitude = 0, .angle = {0, 0}};
-    vec3<float> position = {0, 0, 0};
+    PolarVec3 velocity = {.amplitude = 0, .alfa = 0, .ro = 0};
+    Vec3<float> position = {0, 0, 0}; // chyba nie potrzebne
 };
 
-struct vehicleState : LinearState, RotationalState {
+struct VehicleState : LinearState, RotationalState {
     float deltaHeave = 0;
     float steeringAngle = 0;
+};
+
+class ReactiveEntity {
+   public:
+    Vec3<float> getForce() { return force; }
+    Vec3<float> getPosition() { return position; }
+    Vec3<float> getSelfMoment() { return selfMoment; }
+
+   protected:
+    Vec3<float> position;  // position relative to parent / object owner - vechile has a aero object
+    Vec3<float> force;     // combined force with orign at entity position
+    Vec3<float>
+        selfMoment;  // moment on the entity - not the moment caused on paretn / object owner
 };
