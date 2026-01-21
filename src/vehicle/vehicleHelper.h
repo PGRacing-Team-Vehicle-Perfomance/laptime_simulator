@@ -48,16 +48,6 @@ struct PolarVec3 {
     Angle ro;
 };
 
-struct VecAmp3 {
-    Vec3<float> origin;
-    float amplitude;
-};
-
-struct Dim3Loads {
-    Vec3<VecAmp3> force;
-    Vec3<float> torque;
-};
-
 struct Body {
     float mass;
     Vec3<float> position;
