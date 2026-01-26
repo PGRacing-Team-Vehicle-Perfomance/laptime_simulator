@@ -11,6 +11,6 @@ int main() {
     EnvironmentConfig config;
     
     Vehicle v(vc, tc);
-    v.getState()->velocity.amplitude = 100;
+    v.getState()->velocity.setLength(100);
     v.calculateYawMomentDiagram(1, config);
 }

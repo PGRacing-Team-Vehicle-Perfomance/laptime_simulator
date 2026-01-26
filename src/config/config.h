@@ -9,8 +9,7 @@ struct EnvironmentConfig {
     float airHumidity = 50;                                                     // [%]
     float airDensity = ::airDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                      // [m/s²]
-    PolarVec3 wind = {.amplitude = 0,
-                      .alfa =0, .ro= 0};  //  amplitude [m/s] , angle [°] 0 = from North
+    Vec3f wind = {0, 0, 0};  //  amplitude [m/s] , angle [°] 0 = from North
 };
 
 struct VehicleConfig {

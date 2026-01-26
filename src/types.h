@@ -17,6 +17,9 @@ class Angle {
 
    public:
     Angle(float v = 0) : value(normalize(v)) {}
+
+    static Angle fromRadians(float rad) { return Angle(rad * 180.0f / M_PI); }
+
     float get() const { return value; }
 
     Angle operator+(float rhs) const { return Angle(value + rhs); }
@@ -31,13 +34,7 @@ class Angle {
         return *this;
     }
 
-    float getRadians() { return value / 180.0f * M_PI; }
-};
-
-struct PolarVec3 {
-    float amplitude;
-    Angle alfa;
-    Angle ro;
+    const float getRadians() { return value / 180.0f * M_PI; }
 };
 
 template <typename T>
@@ -45,20 +42,57 @@ struct Vec3 {
     T x;
     T y;
     T z;
-
-    // Vec3<T> operator+(Vec3<T> rhs);
-    // Vec3<T> operator-(Vec3<T> rhs);
-
-    // Vec3<T>& operator+=(Vec3<T> rhs);
-    // Vec3<T>& operator-=(Vec3<T> rhs);
 };
 
 template <>
 struct Vec3<float> {
     float x, y, z;
 
-    // Vec3(float length, Angle phi, Angle theta);
-    // Vec3<float> PolarTransform(float r = 0.0f, Angle phi = 0, Angle theta = 0);
+    Vec3() {};
+    Vec3(float x, float y, float z) : x(x), y(y), z(z) {};
+    Vec3(float length, Angle phi, Angle theta) {
+        float sinPhi = std::sin(phi.getRadians());
+        float cosPhi = std::cos(phi.getRadians());
+        float sinTheta = std::sin(theta.getRadians());
+        float cosTheta = std::cos(theta.getRadians());
+
+        x = length * sinPhi * cosTheta;
+        y = length * sinPhi * sinTheta;
+        z = length * cosPhi;
+    }
+
+    float getLength() const { return std::sqrt(x * x + y * y + z * z); }
+
+    const Angle getPhi() const {
+        float len = getLength();
+        if (len == 0.0f) return Angle::fromRadians(0.0f);
+        return Angle::fromRadians(std::acos(z / len));
+    }
+
+    const Angle getTheta() const {
+        return Angle::fromRadians(std::atan2(y, x));
+    }
+
+    void setLength(float newLength) {
+        float current = getLength();
+        if (current == 0.0f) return;
+        float scale = newLength / current;
+        x *= scale;
+        y *= scale;
+        z *= scale;
+    }
+
+    void setPhi(Angle newPhi) {
+        float len = getLength();
+        Angle theta = getTheta();
+        *this = Vec3<float>(len, newPhi, theta);
+    }
+
+    void setTheta(Angle newTheta) {
+        float len = getLength();
+        Angle phi = getPhi();
+        *this = Vec3<float>(len, phi, newTheta);
+    }
 };
 
 using Vec3f = Vec3<float>;

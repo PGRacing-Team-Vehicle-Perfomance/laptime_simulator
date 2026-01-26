@@ -54,9 +54,9 @@ void Vehicle::calculateYawMomentDiagram(float tolerance,
 std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
                                            const EnvironmentConfig& environmentConfig) {
     Angle beta = state.rotation.z;
-    Vec3<float> velocity;
-    velocity.x = state.velocity.amplitude * std::cos(beta.getRadians());
-    velocity.y = state.velocity.amplitude * std::sin(beta.getRadians());
+    Vec3f velocity;
+    velocity.x = state.velocity.getLength() * std::cos(beta.getRadians());
+    velocity.y = state.velocity.getLength() * std::sin(beta.getRadians());
     velocity.z = 0;
 
     WheelData<float> tireForcesY;

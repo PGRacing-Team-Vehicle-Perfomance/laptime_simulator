@@ -27,7 +27,7 @@ struct RotationalState {
 };
 
 struct LinearState {
-    PolarVec3 velocity = {.amplitude = 0, .alfa = 0, .ro = 0};
+    Vec3f velocity = {0, 0, 0};
     Vec3f position = {0, 0, 0}; // chyba nie potrzebne
 };
 
