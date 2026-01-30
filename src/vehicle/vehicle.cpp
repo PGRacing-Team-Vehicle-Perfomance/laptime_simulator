@@ -7,6 +7,7 @@
 #include <numbers>
 
 #include "config/config.h"
+#include "types.h"
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/tire/tireSimple.h"
@@ -52,7 +53,7 @@ void Vehicle::calculateYawMomentDiagram(float tolerance,
 }
 
 std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
-                                           const EnvironmentConfig& environmentConfig) {
+                                                    const EnvironmentConfig& environmentConfig) {
     Angle beta = state.rotation.z;
     Vec3f velocity;
     velocity.x = state.velocity.getLength() * std::cos(beta.getRadians());
@@ -82,7 +83,6 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
         state.angular_velocity.z = latAcc / velocity.x;
 
         loads = totalTireLoads(latAcc, environmentConfig);
-        springing(loads);
     } while (error > tolerance);
 
     float mz = 0;
@@ -131,8 +131,7 @@ float Vehicle::calculateLatAcc(WheelData<float> tireForcesY) {
     return latAcc;
 }
 
-WheelData<float> Vehicle::totalTireLoads(float latAcc,
-                                            const EnvironmentConfig& environmentConfig) {
+WheelData<float> Vehicle::totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig) {
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig);
     auto transfer = loadTransfer(latAcc);
@@ -151,8 +150,6 @@ WheelData<float> Vehicle::staticLoad(float earthAcc) {
                             combinedTotalMass.position.y);
 }
 
-VehicleState Vehicle::springing(WheelData<float> loads) { return state; }
-
 WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist) {
     WheelData<float> forces;
     forces[CarAcronyms::FL] = totalForce * (trackDistance - frontDist) / trackDistance *
@@ -169,11 +166,10 @@ WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, fl
 WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
     // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
     // center
-    //force = aero.getForce()
-    
+    // force = aero.getForce()
+
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
-    return distributeForces(aero.value.getForce().value.z, aero.position.x,
-                            aero.position.y);
+    return distributeForces(aero.value.getForce().value.z, aero.position.x, aero.position.y);
 }
 
 WheelData<float> Vehicle::loadTransfer(float latAcc) {
@@ -214,4 +210,43 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
     loads[CarAcronyms::RR] = rearTransfer;
 
     return loads;
+}
+
+VehicleState Vehicle::distributeForces(Positioned<float> Fz, float Tx = 0, float Ty = 0) {
+    // equations:
+    //
+    // z_force_equation     Sum(Fz) = 0
+    //
+    // x_torque_equation    Sum(Tx) = 0
+    // y_torque_equation    Sum(Ty) = 0
+    //
+    // one_plane_equation   (H1 + H4)cros = (H2 + H3)cros
+    //
+    // 1_height_equation    H1 = loadless_height - F1z/k1
+    // 2_height_equation    H2 = loadless_height - F2z/k2
+    // 3_height_equation    H3 = loadless_height - F3z/k3
+    // 4_height_equation    H4 = loadless_height - F4z/k4
+    //
+    // number: 8
+
+    // unknowns:
+    //
+    // 1_height
+    // 2_height
+    // 3_height
+    // 4_height
+    //
+    // 1_z_forece
+    // 2_z_forece
+    // 3_z_forece
+    // 4_z_forece
+    //
+    // number: 8
+
+    //
+    // pitch_equation       (H1 - H3)lenght = pith
+    // roll_equation        (H1 - H2)width = roll
+    // heave_eqation        (H1 + H4)/2 = heave
+
+    return VehicleState();
 }

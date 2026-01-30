@@ -69,9 +69,7 @@ struct Vec3<float> {
         return Angle::fromRadians(std::acos(z / len));
     }
 
-    const Angle getTheta() const {
-        return Angle::fromRadians(std::atan2(y, x));
-    }
+    const Angle getTheta() const { return Angle::fromRadians(std::atan2(y, x)); }
 
     void setLength(float newLength) {
         float current = getLength();
@@ -96,6 +94,7 @@ struct Vec3<float> {
 };
 
 using Vec3f = Vec3<float>;
+using Vec3Angle = Vec3<Angle>;
 
 template <typename T>
 struct Positioned {
@@ -116,6 +115,7 @@ using Torque = Vec3f;
 class MassiveObject {
    protected:
     Mass mass;
+
    public:
     Mass getMass() { return mass; }
 };
@@ -123,6 +123,7 @@ class MassiveObject {
 class ForcefullObject {
    protected:
     Force force;
+
    public:
     Force getForce() { return force; }
 };
@@ -130,6 +131,7 @@ class ForcefullObject {
 class TorquedObject {
    protected:
     Torque torque;
+
    public:
     Torque getTorque() { return torque; }
 };

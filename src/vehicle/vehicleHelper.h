@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <cmath>
 #include <cwchar>
 
 #include "types.h"
@@ -21,17 +20,18 @@ struct WheelData {
     std::array<T, CarAcronyms::WHEEL_COUNT> _data;
 };
 
-struct RotationalState {
+struct VehicleState {
     Vec3f angular_velocity = {0, 0, 0};
-    Vec3<Angle> rotation = {0, 0, 0};
-};
+    Vec3Angle rotation = {0, 0, 0};
 
-struct LinearState {
+    Vec3f position = {0, 0, 0};
     Vec3f velocity = {0, 0, 0};
-    Vec3f position = {0, 0, 0}; // chyba nie potrzebne
-};
 
-struct VehicleState : LinearState, RotationalState {
-    float deltaHeave = 0;
+    float& heave() { return position.z; };
+    Angle& pitch() { return rotation.y; };
+    Angle& roll() { return rotation.x; };
+    Angle& chassisSlipAngle() { return rotation.z; };
+    float& yawRate() { return angular_velocity.z; };
+
     float steeringAngle = 0;
 };
