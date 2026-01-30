@@ -15,11 +15,29 @@ Based on: <https://github.com/BAAdas/lap-doer>
 
 ```bash
 git clone https://github.com/PGRacing-Team-Vehicle-Perfomance/laptime_simulator.git
-cd gfr_sim
+cd laptime_simulator
+make        # Build Release
+make run    # Build and run
+```
+
+Available make targets:
+
+| Target    | Description            |
+|-----------|------------------------|
+| `build`   | Build Release (default)|
+| `debug`   | Build Debug            |
+| `run`     | Build and run          |
+| `rebuild` | Clean and rebuild      |
+| `clean`   | Remove build directory |
+| `help`    | Show all targets       |
+
+Or using CMake directly:
+
+```bash
 mkdir build && cd build
 cmake ..
 cmake --build .
-./gfr_sim
+./laptime_simulator
 ```
 
 ### Windows
