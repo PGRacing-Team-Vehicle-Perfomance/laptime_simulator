@@ -6,19 +6,45 @@
 
 #include "types.h"
 
-struct CarAcronyms {
-    static constexpr unsigned int WHEEL_COUNT = 4;
 
-    enum wheelNames : size_t { FL, FR, RL, RR };
-};
+namespace CarConstants {
+    static constexpr unsigned int WHEEL_COUNT = 4;
+}
 
 template <typename T>
 struct WheelData {
-    T& operator[](size_t i) { return _data[i]; }
+    T FL;
+    T FR;
+    T RL;
+    T RR;
 
-    const T& operator[](size_t i) const { return _data[i]; }
+    constexpr T& operator[](size_t i) {
+        switch (i) {
+            case 0:
+                return FL;
+            case 1:
+                return FR;
+            case 2:
+                return RL;
+            case 4:
+                return RR;
+        }
+        return FL;
+    }
 
-    std::array<T, CarAcronyms::WHEEL_COUNT> _data;
+    constexpr const T& operator[](size_t i) const {
+        switch (i) {
+            case 0:
+                return FL;
+            case 1:
+                return FR;
+            case 2:
+                return RL;
+            case 4:
+                return RR;
+        }
+        return FL;
+    }
 };
 
 struct RotationalState {

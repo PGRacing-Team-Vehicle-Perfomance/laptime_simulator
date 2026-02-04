@@ -13,28 +13,54 @@
 #include "vehicle/vehicleHelper.h"
 
 Vehicle::Vehicle(const VehicleConfig& vahicleConfig, const TireConfig& tireConfig)
-    : nonSuspendedMass(vahicleConfig.nonSuspendedMass),
-      suspendedMass(vahicleConfig.suspendedMass),
-      rollCenterHeightFront(vahicleConfig.rollCenterHeightFront),
+    : rollCenterHeightFront(vahicleConfig.rollCenterHeightFront),
       rollCenterHeightBack(vahicleConfig.rollCenterHeightBack),
       antiRollStiffnessFront(vahicleConfig.antiRollStiffnessFront),
       antiRollStiffnessRear(vahicleConfig.antiRollStiffnessRear),
       frontTrackWidth(vahicleConfig.frontTrackWidth),
       rearTrackWidth(vahicleConfig.rearTrackWidth),
       trackDistance(vahicleConfig.trackDistance),
+      suspendedMassAtWheels(vahicleConfig.suspendedMassAtWheels),
+      nonSuspendedMassAtWheels(vahicleConfig.nonSuspendedMassAtWheels),
       aero(vahicleConfig) {
-    for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
-        tires[i] = std::make_unique<TireSimple>(tireConfig, false);
+    combinedNonSuspendedMass = {0, {0, 0, 0}};
+    combinedSuspendedMass = {0, {0, 0, 0}}; 
+
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        tires[i].value = std::make_unique<TireSimple>(tireConfig, false);
+        combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
+        combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
-    combinedTotalMass.value = suspendedMass.value + nonSuspendedMass.value;
-    combinedTotalMass.position = {(suspendedMass.position.x * suspendedMass.value +
-                                   nonSuspendedMass.position.x * nonSuspendedMass.value) /
+    tires.FL.position = {0, -frontTrackWidth / 2, 0};
+    tires.FR.position = {0, frontTrackWidth / 2, 0};
+    tires.RL.position = {trackDistance, -rearTrackWidth / 2, 0};
+    tires.RL.position = {trackDistance, rearTrackWidth / 2, 0};
+    
+    
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        combinedNonSuspendedMass.position.x += nonSuspendedMassAtWheels[i] * tires[i].position.x;
+        combinedNonSuspendedMass.position.y += nonSuspendedMassAtWheels[i] * tires[i].position.y;
+        
+        combinedSuspendedMass.position.x += suspendedMassAtWheels[i] * tires[i].position.x;
+        combinedSuspendedMass.position.y += suspendedMassAtWheels[i] * tires[i].position.y;
+    }
+    combinedNonSuspendedMass.position.x /= combinedNonSuspendedMass.value;
+    combinedNonSuspendedMass.position.y /= combinedNonSuspendedMass.value;
+    combinedNonSuspendedMass.position.z = 0;
+
+    combinedSuspendedMass.position.x /= combinedSuspendedMass.value;
+    combinedSuspendedMass.position.y /= combinedSuspendedMass.value;
+    combinedSuspendedMass.position.z = vahicleConfig.suspendedMassHeight;
+
+    combinedTotalMass.value = combinedSuspendedMass.value + combinedNonSuspendedMass.value;
+    combinedTotalMass.position = {(combinedSuspendedMass.position.x * combinedSuspendedMass.value +
+                                   combinedNonSuspendedMass.position.x * combinedNonSuspendedMass.value) /
                                       combinedTotalMass.value,
-                                  (suspendedMass.position.y * suspendedMass.value +
-                                   nonSuspendedMass.position.y * nonSuspendedMass.value) /
+                                  (combinedSuspendedMass.position.y * combinedSuspendedMass.value +
+                                   combinedNonSuspendedMass.position.y * combinedNonSuspendedMass.value) /
                                       combinedTotalMass.value,
-                                  (suspendedMass.position.z * suspendedMass.value +
-                                   nonSuspendedMass.position.z * nonSuspendedMass.value) /
+                                  (combinedSuspendedMass.position.z * combinedSuspendedMass.value +
+                                   combinedNonSuspendedMass.position.z * combinedNonSuspendedMass.value) /
                                       combinedTotalMass.value};
 }
 
@@ -69,9 +95,9 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
     do {
         slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
 
-        for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
-            tires[i]->calculate(loads[i], slipAngles[i], 0);
-            tireForcesY[i] = tires[i]->getForce().value.y;
+        for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+            tires[i].value->calculate(loads[i], slipAngles[i], 0);
+            tireForcesY[i] = tires[i].value->getForce().value.y;
             // recalculate for forces relative to chassis or speed vector?
             // tire longitudinal forces with slip ratio = 0
         }
@@ -86,20 +112,20 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
     } while (error > tolerance);
 
     float mz = 0;
-    for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
-        mz += tireMomentsY[i] = tires[i]->getTorque().y;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        mz += tireMomentsY[i] = tires[i].value->getTorque().y;
     }
 
     // recalculate for forces relative to chassis
     // same for x moments
     // aero yaw moment
     float yawMoment =
-        ((tireForcesY[CarAcronyms::FL] + tireForcesY[CarAcronyms::FR]) *
+        ((tireForcesY.FL + tireForcesY.FR) *
          combinedTotalMass.position.x) -
-        ((tireForcesY[CarAcronyms::RL] + tireForcesY[CarAcronyms::RR]) *
+        ((tireForcesY.RL + tireForcesY.RR) *
          (trackDistance - combinedTotalMass.position.x)) +
-        ((tireForcesY[CarAcronyms::FR] + tireForcesY[CarAcronyms::RR]) * rearTrackWidth / 2) -
-        ((tireForcesY[CarAcronyms::FL] + tireForcesY[CarAcronyms::RL]) * frontTrackWidth / 2) + mz;
+        ((tireForcesY.FR + tireForcesY.RR) * rearTrackWidth / 2) -
+        ((tireForcesY.FL + tireForcesY.RL) * frontTrackWidth / 2) + mz;
     return {latAcc, yawMoment};
 }
 
@@ -111,12 +137,12 @@ WheelData<float> Vehicle::calculateSlipAngles(float r, Vec3<float> velocity) {
 
     WheelData<float> slipAngle;
 
-    slipAngle[CarAcronyms::FL] =
+    slipAngle.FL =
         (velocity.x + r * a) / velocity.x - r * frontTrackWidth / 2 - state.steeringAngle;
-    slipAngle[CarAcronyms::FR] =
+    slipAngle.FR =
         (velocity.x + r * a) / velocity.x + r * frontTrackWidth / 2 - state.steeringAngle;
-    slipAngle[CarAcronyms::RL] = (velocity.x - r * b) / velocity.x - r * rearTrackWidth / 2;
-    slipAngle[CarAcronyms::RR] = (velocity.x - r * b) / velocity.x + r * rearTrackWidth / 2;
+    slipAngle.RL = (velocity.x - r * b) / velocity.x - r * rearTrackWidth / 2;
+    slipAngle.RR = (velocity.x - r * b) / velocity.x + r * rearTrackWidth / 2;
 
     return slipAngle;
 }
@@ -124,7 +150,7 @@ WheelData<float> Vehicle::calculateSlipAngles(float r, Vec3<float> velocity) {
 float Vehicle::calculateLatAcc(WheelData<float> tireForcesY) {
     float latAcc = 0;
     float latForce = 0;
-    for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         latForce += tireForcesY[i];
     }
     latAcc = latForce / combinedTotalMass.value;
@@ -137,31 +163,31 @@ WheelData<float> Vehicle::totalTireLoads(float latAcc,
     auto aero = aeroLoad(environmentConfig);
     auto transfer = loadTransfer(latAcc);
     WheelData<float> ret;
-    for (size_t i = 0; i < CarAcronyms::WHEEL_COUNT; i++) {
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         ret[i] = std::max(0.f, static_load[i] + aero[i] + transfer[i]);
     }
     return ret;
 }
 
 WheelData<float> Vehicle::staticLoad(float earthAcc) {
-    // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
-    // center here we can fix it by providing 4 masses - on each wheel instead of mass center in
-    // vehicle config
-    return distributeForces(combinedTotalMass.value * earthAcc, combinedTotalMass.position.x,
-                            combinedTotalMass.position.y);
+    WheelData<float> loads;
+    for (int i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        loads[i] = (nonSuspendedMassAtWheels[i] + suspendedMassAtWheels[i]) * earthAcc;
+    }
+    return loads;
 }
 
 VehicleState Vehicle::springing(WheelData<float> loads) { return state; }
-
+ 
 WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, float leftDist) {
     WheelData<float> forces;
-    forces[CarAcronyms::FL] = totalForce * (trackDistance - frontDist) / trackDistance *
+    forces.FL = totalForce * (trackDistance - frontDist) / trackDistance *
                               (frontTrackWidth / 2 + leftDist) / frontTrackWidth;
-    forces[CarAcronyms::FR] = totalForce * (trackDistance - frontDist) / trackDistance *
+    forces.FR = totalForce * (trackDistance - frontDist) / trackDistance *
                               (frontTrackWidth / 2 - leftDist) / frontTrackWidth;
-    forces[CarAcronyms::RL] =
+    forces.RL =
         totalForce * frontDist / trackDistance * (rearTrackWidth / 2 + leftDist) / rearTrackWidth;
-    forces[CarAcronyms::RR] =
+    forces.RR =
         totalForce * frontDist / trackDistance * (rearTrackWidth / 2 - leftDist) / rearTrackWidth;
     return forces;
 }
@@ -179,17 +205,17 @@ WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
 WheelData<float> Vehicle::loadTransfer(float latAcc) {
     // steady state
     float nonSuspendedMassFront =
-        nonSuspendedMass.value * (trackDistance - nonSuspendedMass.position.x) / trackDistance;
-    float nonSuspendedMassRear = nonSuspendedMass.value - nonSuspendedMassFront;
+        combinedNonSuspendedMass.value * (trackDistance - combinedNonSuspendedMass.position.x) / trackDistance;
+    float nonSuspendedMassRear = combinedNonSuspendedMass.value - nonSuspendedMassFront;
 
     float nonSuspendedWTFront =
-        nonSuspendedMassFront * latAcc * nonSuspendedMass.position.z / frontTrackWidth;
+        nonSuspendedMassFront * latAcc * combinedNonSuspendedMass.position.z / frontTrackWidth;
     float nonSuspendedWTRear =
-        nonSuspendedMassRear * latAcc * nonSuspendedMass.position.z / rearTrackWidth;
+        nonSuspendedMassRear * latAcc * combinedNonSuspendedMass.position.z / rearTrackWidth;
 
     float suspendedMassFront =
-        suspendedMass.value * (trackDistance - suspendedMass.position.x) / trackDistance;
-    float suspendedMassRear = suspendedMass.value - suspendedMassFront;
+        combinedSuspendedMass.value * (trackDistance - combinedSuspendedMass.position.x) / trackDistance;
+    float suspendedMassRear = combinedSuspendedMass.value - suspendedMassFront;
 
     float geometricWTFront = suspendedMassFront * latAcc * rollCenterHeightFront / frontTrackWidth;
     float geometricWTRear = suspendedMassRear * latAcc * rollCenterHeightBack / rearTrackWidth;
@@ -197,10 +223,10 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
     float antiRollStiffnessTotal = antiRollStiffnessFront + antiRollStiffnessRear;
 
     float elasticWTFront = suspendedMassFront * latAcc *
-                           (suspendedMass.position.z - rollCenterHeightFront) *
+                           (combinedSuspendedMass.position.z - rollCenterHeightFront) *
                            (antiRollStiffnessFront / antiRollStiffnessTotal) / frontTrackWidth;
     float elasticWTRear = suspendedMassRear * latAcc *
-                          (suspendedMass.position.z - rollCenterHeightBack) *
+                          (combinedSuspendedMass.position.z - rollCenterHeightBack) *
                           (antiRollStiffnessRear / antiRollStiffnessTotal) / rearTrackWidth;
 
     float frontTransfer = nonSuspendedWTFront + geometricWTFront + elasticWTFront;
@@ -208,10 +234,10 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
 
     WheelData<float> loads;
 
-    loads[CarAcronyms::FL] = -frontTransfer;
-    loads[CarAcronyms::FR] = frontTransfer;
-    loads[CarAcronyms::RL] = -rearTransfer;
-    loads[CarAcronyms::RR] = rearTransfer;
+    loads.FL = -frontTransfer;
+    loads.FR = frontTransfer;
+    loads.RL = -rearTransfer;
+    loads.RR = rearTransfer;
 
     return loads;
 }

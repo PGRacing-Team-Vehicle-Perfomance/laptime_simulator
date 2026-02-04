@@ -11,8 +11,11 @@
 class Vehicle {
     Mass combinedTotalMass;
 
-    Mass nonSuspendedMass;
-    Mass suspendedMass;
+    Mass combinedNonSuspendedMass;
+    Mass combinedSuspendedMass;
+
+    WheelData<float> nonSuspendedMassAtWheels;
+    WheelData<float> suspendedMassAtWheels;
 
     float rollCenterHeightFront;
     float rollCenterHeightBack;
@@ -27,7 +30,8 @@ class Vehicle {
 
     Positioned<Aero> aero;
 
-    WheelData<std::unique_ptr<Tire>> tires;
+    WheelData<Positioned<std::unique_ptr<Tire>>> tires; 
+    //WheelData<std::unique_ptr<Tire>> tires;
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance,
                                                const EnvironmentConfig& environmentConfig);
