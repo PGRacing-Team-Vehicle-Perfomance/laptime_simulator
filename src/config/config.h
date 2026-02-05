@@ -14,24 +14,33 @@ struct EnvironmentConfig {
 };
 
 struct VehicleConfig {
-    WheelData<float> nonSuspendedMassAtWheels = {0,0,0,0};
-    WheelData<float> suspendedMassAtWheels = {.FL = 20, .FR = 20, .RL = 30, .RR = 30};
-    float suspendedMassHeight = 1;
+    WheelData<float> nonSuspendedMassAtWheels = {.FL = 7.5,.FR = 7.5,.RL = 8, .RR = 8};
+    WheelData<float> suspendedMassAtWheels = {.FL = 60, .FR = 60, .RL = 64.5, .RR = 64.5};
+    float suspendedMassHeight = 0.33;
 
-    float rollCenterHeightFront = 0.33;
-    float rollCenterHeightBack = 0.33;
+    float rollCenterHeightFront = 0.0491;
+    float rollCenterHeightBack = 0.0539;
+    
+    
+    float frontSpringMotionRatio = 0;
+    float frontArbMotionRatio = 0;
+    float frontKspring = 0;
+    float frontKarb = 0;
 
-    float antiRollStiffnessFront = 15000.0;
-    float antiRollStiffnessRear = 15000.0;
+    float rearSpringMotionRatio = 0;
+    float rearArbMotionRatio = 0;
+    float rearKspring = 0;
+    float rearKarb = 0;
+    // chasiss stiffness would need to be as Nm/deg front rear
 
     float frontTrackWidth = 1.256;
     float rearTrackWidth = 1.216;
-    float trackDistance = 2;
+    float trackDistance = 1.53;
 
-    float cla = 4.3;
+    float cla = 3.7;
 
     // {0 0} geometric center of front axel
-    Vec3f claPosition = {0.5, 0.5, 0.0};
+    Vec3f claPosition = {0, 0.75, 0.0}; // change to % maby
 };
 
 struct TireConfig {

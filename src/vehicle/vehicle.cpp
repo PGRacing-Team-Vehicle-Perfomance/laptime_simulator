@@ -6,6 +6,9 @@
 #include <memory>
 #include <numbers>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
@@ -15,8 +18,6 @@
 Vehicle::Vehicle(const VehicleConfig& vahicleConfig, const TireConfig& tireConfig)
     : rollCenterHeightFront(vahicleConfig.rollCenterHeightFront),
       rollCenterHeightBack(vahicleConfig.rollCenterHeightBack),
-      antiRollStiffnessFront(vahicleConfig.antiRollStiffnessFront),
-      antiRollStiffnessRear(vahicleConfig.antiRollStiffnessRear),
       frontTrackWidth(vahicleConfig.frontTrackWidth),
       rearTrackWidth(vahicleConfig.rearTrackWidth),
       trackDistance(vahicleConfig.trackDistance),
@@ -62,6 +63,23 @@ Vehicle::Vehicle(const VehicleConfig& vahicleConfig, const TireConfig& tireConfi
                                   (combinedSuspendedMass.position.z * combinedSuspendedMass.value +
                                    combinedNonSuspendedMass.position.z * combinedNonSuspendedMass.value) /
                                       combinedTotalMass.value};
+
+    float frontSpringWheelRate =
+        vahicleConfig.frontKspring / std::pow(vahicleConfig.frontSpringMotionRatio, 2);
+    float frontTorqueSpring =
+        std::pow(frontTrackWidth, 2) * std::tan(M_PI / 180) * frontSpringWheelRate / 2;
+    float frontArbTorque = vahicleConfig.frontKarb * std::pow(vahicleConfig.frontTrackWidth, 2) *
+                           std::tan(M_PI / 180) / std::pow(vahicleConfig.frontArbMotionRatio, 2);
+    antiRollStiffnessFront = frontArbTorque + frontTorqueSpring;
+
+    
+    float rearSpringWheelRate =
+        vahicleConfig.rearKspring / std::pow(vahicleConfig.rearSpringMotionRatio, 2);
+    float rearTorqueSpring =
+        std::pow(frontTrackWidth, 2) * std::tan(M_PI / 180) * rearSpringWheelRate / 2;
+    float rearArbTorque = vahicleConfig.rearKarb * std::pow(vahicleConfig.rearTrackWidth, 2) *
+                           std::tan(M_PI / 180) / std::pow(vahicleConfig.rearArbMotionRatio, 2);
+    antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
 }
 
 void Vehicle::calculateYawMomentDiagram(float tolerance,
@@ -193,9 +211,7 @@ WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, fl
 }
 
 WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
-    // known problem described in onenote - cannot calculate distribution to 4 corners from one mass
-    // center
-    //force = aero.getForce()
+    // known problem described in onenote - cannot calculate distribution to 4 corners from one mass center
     
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
     return distributeForces(aero.value.getForce().value.z, aero.position.x,
@@ -203,7 +219,6 @@ WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
 }
 
 WheelData<float> Vehicle::loadTransfer(float latAcc) {
-    // steady state
     float nonSuspendedMassFront =
         combinedNonSuspendedMass.value * (trackDistance - combinedNonSuspendedMass.position.x) / trackDistance;
     float nonSuspendedMassRear = combinedNonSuspendedMass.value - nonSuspendedMassFront;
@@ -221,6 +236,8 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
     float geometricWTRear = suspendedMassRear * latAcc * rollCenterHeightBack / rearTrackWidth;
 
     float antiRollStiffnessTotal = antiRollStiffnessFront + antiRollStiffnessRear;
+
+    // instead of antirollstiffnes -> anti roll torque == resistance moment
 
     float elasticWTFront = suspendedMassFront * latAcc *
                            (combinedSuspendedMass.position.z - rollCenterHeightFront) *
