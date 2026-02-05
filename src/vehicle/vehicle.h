@@ -31,8 +31,7 @@ class Vehicle {
     Positioned<Aero> aero;
 
     WheelData<Positioned<std::unique_ptr<Tire>>> tires; 
-    //WheelData<std::unique_ptr<Tire>> tires;
-
+    
     std::array<float, 2> getLatAccAndYawMoment(float tolerance,
                                                const EnvironmentConfig& environmentConfig);
     WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
