@@ -1,7 +1,9 @@
 #pragma once
 
+#include <array>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
@@ -48,4 +50,6 @@ class Vehicle {
     Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
     void calculateYawMomentDiagram(float tolerance, const EnvironmentConfig& environmentConfig);
+    std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
+        float tolerance, const EnvironmentConfig& environmentConfig);
 };

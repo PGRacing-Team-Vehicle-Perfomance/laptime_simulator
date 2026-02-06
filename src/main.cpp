@@ -12,5 +12,18 @@ int main() {
     
     Vehicle v(vc, tc);
     v.getState()->velocity.setLength(100);
-    v.calculateYawMomentDiagram(1, config);
+    // Generate dataset and write CSV for external visualization
+    auto points = v.getYawMomentDiagramPoints(1, config);
+    // Ensure build directory exists at runtime when running from project root
+    FILE *f = fopen("build/yaw_diagram.csv", "w");
+    if (f) {
+        fprintf(f, "steering,slip,latAcc,yawMoment\n");
+        for (const auto &p : points) {
+            fprintf(f, "%f,%f,%f,%f\n", p[0], p[1], p[2], p[3]);
+        }
+        fclose(f);
+        std::cout << "Wrote build/yaw_diagram.csv\n";
+    } else {
+        std::cerr << "Failed to open build/yaw_diagram.csv for writing\n";
+    }
 }
