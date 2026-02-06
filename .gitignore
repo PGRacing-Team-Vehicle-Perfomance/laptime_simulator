@@ -3,3 +3,4 @@ build
 .vs
 out
 .cache
+.venv

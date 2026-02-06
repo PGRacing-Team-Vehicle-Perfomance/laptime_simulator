@@ -84,15 +84,26 @@ Vehicle::Vehicle(const VehicleConfig& vahicleConfig, const TireConfig& tireConfi
 
 void Vehicle::calculateYawMomentDiagram(float tolerance,
                                         const EnvironmentConfig& environmentConfig) {
+    // Use the new data-generation method and print results (keeps compatibility)
+    auto points = getYawMomentDiagramPoints(tolerance, environmentConfig);
+    for (const auto &p : points) {
+        printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n",
+               p[0], p[1], p[2], p[3]);
+    }
+}
+
+std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(float tolerance,
+                                                                    const EnvironmentConfig& environmentConfig) {
+    std::vector<std::array<float, 4>> out;
     for (int i = 0; i < 90; i++) {
-        state.steeringAngle = i;
+        state.steeringAngle = static_cast<float>(i);
         for (int j = 0; j < 90; j++) {
-            state.rotation.z = j;
+            state.rotation.z = Angle(static_cast<float>(j));
             std::array<float, 2> diagramPoint = getLatAccAndYawMoment(tolerance, environmentConfig);
-            printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n",
-                   state.steeringAngle, state.rotation.z.get(), diagramPoint[0], diagramPoint[1]);
+            out.push_back({state.steeringAngle, state.rotation.z.get(), diagramPoint[0], diagramPoint[1]});
         }
     }
+    return out;
 }
 
 std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance,
