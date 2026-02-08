@@ -34,7 +34,7 @@ class Vehicle {
 
     WheelData<Positioned<std::unique_ptr<Tire>>> tires; 
     
-    std::array<float, 2> getLatAccAndYawMoment(float tolerance,
+    std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations, 
                                                const EnvironmentConfig& environmentConfig);
     WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
     WheelData<float> staticLoad(float earthAcc);
@@ -49,7 +49,7 @@ class Vehicle {
     VehicleState* getState();
     Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
-    void calculateYawMomentDiagram(float tolerance, const EnvironmentConfig& environmentConfig);
+    void calculateYawMomentDiagram(float tolerance, int maxIterations, const EnvironmentConfig& environmentConfig);
     std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
-        float tolerance, const EnvironmentConfig& environmentConfig);
+        float tolerance, int maxIterations, const EnvironmentConfig& environmentConfig);
 };

@@ -11,9 +11,11 @@ int main() {
     EnvironmentConfig config;
     
     Vehicle v(vc, tc);
-    v.getState()->velocity.setLength(100);
+    v.getState()->velocity.setLength(11);
+    // v.calculateYawMomentDiagram(0.0001, config);
+
     // Generate dataset and write CSV for external visualization
-    auto points = v.getYawMomentDiagramPoints(1, config);
+    auto points = v.getYawMomentDiagramPoints(2, 100, config);
     // Ensure build directory exists at runtime when running from project root
     FILE *f = fopen("build/yaw_diagram.csv", "w");
     if (f) {

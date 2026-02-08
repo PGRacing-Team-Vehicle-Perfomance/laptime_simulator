@@ -14,6 +14,7 @@ add_executable(${PROJECT_NAME}
     src/vehicle/aero/aero.cpp
     src/simulation/skidpad.cpp
     src/vehicle/tire/tireSimple.cpp
+    src/vehicle/tire/tirePacejka.cpp
 )
 
 target_include_directories(laptime_simulator PRIVATE src)

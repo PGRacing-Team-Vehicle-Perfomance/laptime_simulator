@@ -75,7 +75,12 @@ struct Vec3<float> {
 
     void setLength(float newLength) {
         float current = getLength();
-        if (current == 0.0f) return;
+        
+        if (current == 0.0f) {
+            x = newLength;
+            return;
+        }
+
         float scale = newLength / current;
         x *= scale;
         y *= scale;
