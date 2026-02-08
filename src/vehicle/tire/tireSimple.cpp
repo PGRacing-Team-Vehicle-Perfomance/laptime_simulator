@@ -1,10 +1,14 @@
 #include "vehicle/tire/tireSimple.h"
-#include "config/config.h"
 
 #include <cmath>
 
+#include "config/config.h"
+
 TireSimple::TireSimple(const TireConfig& config, bool isDriven)
-    : Tire(config, isDriven) {}
+    : Tire(config, isDriven),
+      scalingFactor(config.scalingFac),
+      quadFac(config.quadFac),
+      linFac(config.linFac) {}
 
 float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
     if (isDriven || isLateral) {
@@ -15,5 +19,5 @@ float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
 
 void TireSimple::calculate(float verticalLoad, float slipAngle, float slipRatio) {
     force.value.y = calculateForce(verticalLoad, true);
-    force.value.y = calculateForce(verticalLoad, false);
+    // force.value.x = calculateForce(verticalLoad, false);
 }

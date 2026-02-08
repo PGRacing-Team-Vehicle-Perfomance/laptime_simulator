@@ -16,7 +16,7 @@ def read_csv(path):
         r = csv.DictReader(csvfile)
         for row in r:
             # steering,slip,latAcc,yawMoment
-            x.append(float(row['steering']))
+            x.append(float(row['latAcc']))
             y.append(float(row['yawMoment']))
     return x, y
 
