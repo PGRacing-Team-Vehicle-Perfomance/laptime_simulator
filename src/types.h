@@ -16,7 +16,7 @@ class Angle {
     }
 
    public:
-    Angle(float v = 0) : value(normalize(v)) {}
+    Angle(float v = 0) : value(v) {}
 
     static Angle fromRadians(float rad) { return Angle(rad * 180.0f / M_PI); }
 
@@ -26,15 +26,17 @@ class Angle {
     Angle operator-(float rhs) const { return Angle(value - rhs); }
 
     Angle& operator+=(float rhs) {
-        value = normalize(value + rhs);
+        //value = normalize(value + rhs);
+        value += rhs;
         return *this;
     }
     Angle& operator-=(float rhs) {
-        value = normalize(value - rhs);
+        //value = normalize(value - rhs);
+        value -= rhs;
         return *this;
     }
 
-    const float getRadians() { return value / 180.0f * M_PI; }
+    float getRadians() const { return value / 180.0f * M_PI; }
 };
 
 template <typename T>

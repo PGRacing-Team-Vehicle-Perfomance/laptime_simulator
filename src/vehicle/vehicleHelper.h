@@ -40,7 +40,7 @@ struct WheelData {
                 return FR;
             case 2:
                 return RL;
-            case 4:
+            case 3:
                 return RR;
         }
         return FL;

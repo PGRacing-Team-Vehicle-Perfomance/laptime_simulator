@@ -6,14 +6,14 @@
 #include "vehicle/vehicle.h"
 
 int main() {
-    TireConfig tc;
-    VehicleConfig vc;
-    EnvironmentConfig config;
+    TireConfig tireConfig;
+    VehicleConfig vehicleConfig;
+    EnvironmentConfig environmentConfig;
     
-    Vehicle v(vc, tc);
+    Vehicle v(vehicleConfig, tireConfig);
     v.getState()->velocity.setLength(11);
     
-    auto points = v.getYawMomentDiagramPoints(0.0001, 100, config);
+    auto points = v.getYawMomentDiagramPoints(environmentConfig, 25, 0.2, 20, 1);
     FILE *f = fopen("build/yaw_diagram.csv", "w");
     if (f) {
         fprintf(f, "steering,slip,latAcc,yawMoment\n");

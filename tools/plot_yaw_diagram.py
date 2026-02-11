@@ -29,9 +29,9 @@ def main():
     x, y = read_csv(path)
     plt.figure(figsize=(8,6))
     plt.scatter(x, y, s=6)
-    plt.xlabel('Steering angle')
+    plt.xlabel('lateral acceleration')
     plt.ylabel('Yaw moment')
-    plt.title('Yaw moment vs steering angle (scatter)')
+    plt.title('Yaw moment vs steering angle')
     plt.grid(True)
     plt.tight_layout()
     # If running without an interactive display (headless / Agg backend), save to PNG.

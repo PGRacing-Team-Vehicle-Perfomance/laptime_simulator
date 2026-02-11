@@ -10,8 +10,8 @@
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
-#include "vehicle/tire/tireSimple.h"
 #include "vehicle/tire/tirePacejka.h"
+#include "vehicle/tire/tireSimple.h"
 #include "vehicle/vehicle.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -26,11 +26,15 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
     aero.value = {vehicleConfig};
     aero.position = vehicleConfig.claPosition;
 
+    tires.FL.value = std::make_unique<TirePacejka>(tireConfig, false, Left);
+    tires.FR.value = std::make_unique<TirePacejka>(tireConfig, false, Right);
+    tires.RL.value = std::make_unique<TirePacejka>(tireConfig, false, Left);
+    tires.RR.value = std::make_unique<TirePacejka>(tireConfig, false, Right);
+
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
 
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tires[i].value = std::make_unique<TirePacejka>(tireConfig, false);
         combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
         combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
@@ -77,29 +81,22 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
     float rearSpringWheelRate =
         vehicleConfig.rearKspring / std::pow(vehicleConfig.rearSpringMotionRatio, 2);
     float rearTorqueSpring =
-        std::pow(frontTrackWidth, 2) * std::tan(M_PI / 180) * rearSpringWheelRate / 2;
+        std::pow(rearTrackWidth, 2) * std::tan(M_PI / 180) * rearSpringWheelRate / 2;
     float rearArbTorque = vehicleConfig.rearKarb * std::pow(vehicleConfig.rearTrackWidth, 2) *
                           std::tan(M_PI / 180) / std::pow(vehicleConfig.rearArbMotionRatio, 2);
     antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
-    }
-
-void Vehicle::calculateYawMomentDiagram(float tolerance, int maxIterations, 
-                                        const EnvironmentConfig& environmentConfig) {
-    auto points = getYawMomentDiagramPoints(tolerance, maxIterations, environmentConfig);
-    for (const auto& p : points) {
-        printf("steering angle: %f, chassis slip angle: %f, lat acc: %f, yaw moment: %f\n", p[0],
-               p[1], p[2], p[3]);
-    }
 }
 
 std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
-    float tolerance, int maxIterations, const EnvironmentConfig& environmentConfig) {
+            const EnvironmentConfig& environmentConfig, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance, int maxIterations) {
     std::vector<std::array<float, 4>> out;
-    for (int steeringAngle = -45; steeringAngle < 45; steeringAngle++) {  // maby as parameter
+    for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle; steeringAngle += steeringAngleStep) {
         state.steeringAngle = static_cast<float>(steeringAngle);
-        for (int chassisSlipAngle = -20; chassisSlipAngle < 20; chassisSlipAngle++) {
+        for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle; chassisSlipAngle += slipAngleStep) {
             state.rotation.z = Angle(static_cast<float>(chassisSlipAngle));
-            std::array<float, 2> diagramPoint = getLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
+            state.angular_velocity = {0, 0, 0};
+            std::array<float, 2> diagramPoint =
+                getLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
             out.push_back(
                 {state.steeringAngle, state.rotation.z.get(), diagramPoint[0], diagramPoint[1]});
         }
@@ -107,7 +104,7 @@ std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
     return out;
 }
 
-std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIterations, 
+std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                     const EnvironmentConfig& environmentConfig) {
     Angle beta = state.rotation.z;
     Vec3f velocity;
@@ -116,7 +113,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     velocity.z = 0;
 
     WheelData<float> tireForcesY;
-    WheelData<float> tireMomentsY;
+    WheelData<float> tireMomentsY{0,0,0,0};
     WheelData<float> slipAngles;
     float latAcc = 0;
     float error;
@@ -142,17 +139,16 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
 
     float mz = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        mz += tireMomentsY[i] = tires[i].value->getTorque().y;
+        mz = mz + tireMomentsY[i] + tires[i].value->getTorque().y;
     }
 
     // TODO:
     // aero yaw moment
+    // tire fx * r
     auto vehicleFy = getVehicleFyFromTireFy(tireForcesY);
     float yawMoment =
         ((vehicleFy.FL + vehicleFy.FR) * combinedTotalMass.position.x) -
-        ((vehicleFy.RL + vehicleFy.RR) * (trackDistance - combinedTotalMass.position.x)) +
-        ((vehicleFy.FR + vehicleFy.RR) * rearTrackWidth / 2) -
-        ((vehicleFy.FL + vehicleFy.RL) * frontTrackWidth / 2) + mz;
+        ((vehicleFy.RL + vehicleFy.RR) * (trackDistance - combinedTotalMass.position.x)) + mz;
     return {latAcc, yawMoment};
 }
 
@@ -164,16 +160,16 @@ WheelData<float> Vehicle::calculateSlipAngles(float yawVelocity, Vec3<float> vel
 
     WheelData<float> slipAngle;
 
-    slipAngle.FL = (velocity.y + yawVelocity * massToFront) /
-                       (velocity.x - yawVelocity * frontTrackWidth / 2.0) -
+    slipAngle.FL = std::atan((velocity.y + yawVelocity * massToFront) /
+                             (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
                    state.steeringAngle / 180 * M_PI;
-    slipAngle.FR = (velocity.y + yawVelocity * massToFront) /
-                       (velocity.x + yawVelocity * frontTrackWidth / 2.0) -
+    slipAngle.FR = std::atan((velocity.y + yawVelocity * massToFront) /
+                             (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
                    state.steeringAngle / 180 * M_PI;
-    slipAngle.RL =
-        (velocity.y - yawVelocity * massToRear) / (velocity.x - yawVelocity * rearTrackWidth / 2.0);
-    slipAngle.RR =
-        (velocity.y - yawVelocity * massToRear) / (velocity.x + yawVelocity * rearTrackWidth / 2.0);
+    slipAngle.RL = std::atan((velocity.y - yawVelocity * massToRear) /
+                             (velocity.x - yawVelocity * rearTrackWidth / 2.0));
+    slipAngle.RR = std::atan((velocity.y - yawVelocity * massToRear) /
+                             (velocity.x + yawVelocity * rearTrackWidth / 2.0));
 
     return slipAngle;
 }
@@ -193,7 +189,7 @@ WheelData<float> Vehicle::getVehicleFyFromTireFy(const WheelData<float> tireFy) 
     WheelData<float> vehicleFy;
     vehicleFy.RL = tireFy.RL;
     vehicleFy.RR = tireFy.RR;
-    
+
     float radiansSteeringAngle = M_PI / 180 * state.steeringAngle;
     vehicleFy.FL = tireFy.FL * std::cos(radiansSteeringAngle);
     vehicleFy.FR = tireFy.FR * std::cos(radiansSteeringAngle);
