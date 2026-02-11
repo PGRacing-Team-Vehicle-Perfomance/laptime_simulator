@@ -12,11 +12,8 @@ int main() {
     
     Vehicle v(vc, tc);
     v.getState()->velocity.setLength(11);
-    // v.calculateYawMomentDiagram(0.0001, config);
-
-    // Generate dataset and write CSV for external visualization
-    auto points = v.getYawMomentDiagramPoints(2, 100, config);
-    // Ensure build directory exists at runtime when running from project root
+    
+    auto points = v.getYawMomentDiagramPoints(0.0001, 100, config);
     FILE *f = fopen("build/yaw_diagram.csv", "w");
     if (f) {
         fprintf(f, "steering,slip,latAcc,yawMoment\n");

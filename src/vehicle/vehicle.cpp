@@ -130,8 +130,6 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
             tires[i].value->calculate(loads[i], slipAngles[i], 0);
             tireForcesY[i] = tires[i].value->getForce().value.y;
-            // TODO:
-            // recalculate for forces relative to chassis
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesY);
@@ -148,14 +146,13 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     }
 
     // TODO:
-    // recalculate for forces relative to chassis
-    // same for x moments
     // aero yaw moment
+    auto vehicleFy = getVehicleFyFromTireFy(tireForcesY);
     float yawMoment =
-        ((tireForcesY.FL + tireForcesY.FR) * combinedTotalMass.position.x) -
-        ((tireForcesY.RL + tireForcesY.RR) * (trackDistance - combinedTotalMass.position.x)) +
-        ((tireForcesY.FR + tireForcesY.RR) * rearTrackWidth / 2) -
-        ((tireForcesY.FL + tireForcesY.RL) * frontTrackWidth / 2) + mz;
+        ((vehicleFy.FL + vehicleFy.FR) * combinedTotalMass.position.x) -
+        ((vehicleFy.RL + vehicleFy.RR) * (trackDistance - combinedTotalMass.position.x)) +
+        ((vehicleFy.FR + vehicleFy.RR) * rearTrackWidth / 2) -
+        ((vehicleFy.FL + vehicleFy.RL) * frontTrackWidth / 2) + mz;
     return {latAcc, yawMoment};
 }
 
@@ -184,13 +181,23 @@ WheelData<float> Vehicle::calculateSlipAngles(float yawVelocity, Vec3<float> vel
 float Vehicle::calculateLatAcc(WheelData<float> tireForcesY) {
     float latAcc = 0;
     float latForce = 0;
+    auto vehicleFy = getVehicleFyFromTireFy(tireForcesY);
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        latForce += tireForcesY[i];
-        // TODO:
-        // recalculate for forces relative to chassis
+        latForce += vehicleFy[i];
     }
     latAcc = latForce / combinedTotalMass.value;
     return latAcc;
+}
+
+WheelData<float> Vehicle::getVehicleFyFromTireFy(const WheelData<float> tireFy) {
+    WheelData<float> vehicleFy;
+    vehicleFy.RL = tireFy.RL;
+    vehicleFy.RR = tireFy.RR;
+    
+    float radiansSteeringAngle = M_PI / 180 * state.steeringAngle;
+    vehicleFy.FL = tireFy.FL * std::cos(radiansSteeringAngle);
+    vehicleFy.FR = tireFy.FR * std::cos(radiansSteeringAngle);
+    return vehicleFy;
 }
 
 WheelData<float> Vehicle::totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig) {
