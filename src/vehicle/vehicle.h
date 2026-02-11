@@ -44,13 +44,11 @@ class Vehicle {
     WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
     WheelData<float> loadTransfer(float latAcc);
     WheelData<float> getVehicleFyFromTireFy(const WheelData<float> tireFy);
-    VehicleState springing(WheelData<float> loads);
-
+    VehicleState springing(WheelData<float> loads);   
    public:
     VehicleState* getState();
     Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
-    void calculateYawMomentDiagram(float tolerance, int maxIterations, const EnvironmentConfig& environmentConfig);
     std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
-        float tolerance, int maxIterations, const EnvironmentConfig& environmentConfig);
+        const EnvironmentConfig& environmentConfig, float maxSteeringAngle = 10, float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1, float tolerance = 0.01, int maxIterations = 100);
 };
