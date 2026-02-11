@@ -43,6 +43,7 @@ class Vehicle {
     WheelData<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
     WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
     WheelData<float> loadTransfer(float latAcc);
+    WheelData<float> getVehicleFyFromTireFy(const WheelData<float> tireFy);
     VehicleState springing(WheelData<float> loads);
 
    public:
