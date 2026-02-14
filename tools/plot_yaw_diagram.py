@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
-"""
-Simple cross-platform CSV plotter for yaw diagram.
-Usage: python3 tools/plot_yaw_diagram.py build/yaw_diagram.csv
-"""
+
 import sys
 import csv
 import matplotlib
 import matplotlib.pyplot as plt
-import os
+from collections import defaultdict
 
 def read_csv(path):
-    x = []
-    y = []
+    data = []
     with open(path, newline='') as csvfile:
         r = csv.DictReader(csvfile)
         for row in r:
-            # steering,slip,latAcc,yawMoment
-            x.append(float(row['latAcc']))
-            y.append(float(row['yawMoment']))
-    return x, y
+            data.append({
+                'steering': float(row['steering']),
+                'slip': float(row['slip']),
+                'latAcc': float(row['latAcc']),
+                'yawMoment': float(row['yawMoment'])
+            })
+    return data
 
 
 def main():
@@ -26,32 +25,48 @@ def main():
         print("Usage: python3 tools/plot_yaw_diagram.py path/to/yaw_diagram.csv")
         sys.exit(1)
     path = sys.argv[1]
-    x, y = read_csv(path)
-    plt.figure(figsize=(8,6))
-    plt.scatter(x, y, s=6)
-    plt.xlabel('lateral acceleration')
+    data = read_csv(path)
+    
+    # Group by steering angle
+    by_steering = defaultdict(list)
+    # Group by slip angle
+    by_slip = defaultdict(list)
+    
+    for point in data:
+        by_steering[point['steering']].append(point)
+        by_slip[point['slip']].append(point)
+    
+    plt.figure(figsize=(10, 8))
+    
+    # Draw lines for constant steering angles (varying slip)
+    for steering_angle in sorted(by_steering.keys()):
+        points = sorted(by_steering[steering_angle], key=lambda p: p['slip'])
+        x = [p['latAcc'] for p in points]
+        y = [p['yawMoment'] for p in points]
+        plt.plot(x, y, alpha=0.5, linewidth=0.8)
+    
+    # Draw lines for constant slip angles (varying steering)
+    for slip_angle in sorted(by_slip.keys()):
+        points = sorted(by_slip[slip_angle], key=lambda p: p['steering'])
+        x = [p['latAcc'] for p in points]
+        y = [p['yawMoment'] for p in points]
+        plt.plot(x, y, alpha=0.5, linewidth=0.8)
+    
+    # Add scatter points on top
+    x_all = [p['latAcc'] for p in data]
+    y_all = [p['yawMoment'] for p in data]
+    plt.scatter(x_all, y_all, s=6, zorder=5)
+    
+    plt.xlabel('Lateral acceleration')
     plt.ylabel('Yaw moment')
-    plt.title('Yaw moment vs steering angle')
-    plt.grid(True)
+    plt.title('Yaw moment diagram')
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    # If running without an interactive display (headless / Agg backend), save to PNG.
-    backend = matplotlib.get_backend().lower()
-    headless = False
-    if sys.platform.startswith('linux') and not os.environ.get('DISPLAY'):
-        headless = True
+    
+    out_png = path[:-4] + '.png' if path.lower().endswith('.csv') else path + '.png'
+    plt.savefig(out_png)
+    print(f"Saved plot to {out_png}")
 
-    out_png = None
-    if 'agg' in backend or headless:
-        out_png = path[:-4] + '.png' if path.lower().endswith('.csv') else path + '.png'
-        plt.savefig(out_png)
-        print(f"Saved plot to {out_png}")
-    else:
-        try:
-            plt.show()
-        except Exception:
-            out_png = path[:-4] + '.png' if path.lower().endswith('.csv') else path + '.png'
-            plt.savefig(out_png)
-            print(f"Saved plot to {out_png} (show failed)")
 
 if __name__ == '__main__':
     main()
