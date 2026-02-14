@@ -54,7 +54,7 @@ struct RotationalState {
 
 struct LinearState {
     Vec3f velocity = {0, 0, 0};
-    Vec3f position = {0, 0, 0}; // chyba nie potrzebne
+    Vec3f position = {0, 0, 0};
 };
 
 struct VehicleState : LinearState, RotationalState {
