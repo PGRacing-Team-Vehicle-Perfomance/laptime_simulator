@@ -28,6 +28,10 @@ class Vehicle {
     float frontTrackWidth;
     float rearTrackWidth;
     float trackDistance;
+
+    WheelData<float> toeAngle;
+    float ackermannPercentage;
+
     VehicleState state;
 
     Positioned<Aero> aero;
@@ -37,6 +41,7 @@ class Vehicle {
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations, 
                                                const EnvironmentConfig& environmentConfig);
     WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
+    WheelData<float> calculateSteeringAngles();
     WheelData<float> staticLoad(float earthAcc);
     float calculateLatAcc(const WheelData<float>& tireForcesX,
                           const WheelData<float>& tireForcesY);

@@ -36,6 +36,15 @@ struct VehicleConfig {
     float rearTrackWidth = 1.216;
     float trackDistance = 1.53;
 
+    // Toe angles [deg] - positive = toe-in, negative = toe-out
+    WheelData<float> toeAngle = {.FL = 0, .FR = 0, .RL = 0, .RR = 0};
+
+    // TODO: Ackermann - implement as one of:
+    //   - Ackermann %: 0=parallel, 100=ideal (cot(δ_o)-cot(δ_i)=t/L)
+    //   - TOOT [deg] at reference angle [deg]
+    //   - Direct inner/outer angles from CAD
+    float ackermannPercentage = 0;  // [%] dummy - not implemented
+
     float cla = 3.7;
 
     // {0 0} geometric center of front axel
