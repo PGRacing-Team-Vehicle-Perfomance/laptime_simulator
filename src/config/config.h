@@ -42,7 +42,8 @@ struct VehicleConfig {
     Vec3f claPosition = {0.75, 0.0, 0.0};  // change to % maby
 };
 
-// TODO: split into different configs for simple and pacejka and create implementation based on provided
+// TODO: split into different configs for simple and pacejka and create implementation based on
+// provided
 struct TireConfig {
     float scalingFac = 0.75;
     float quadFac = -0.0002;

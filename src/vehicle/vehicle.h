@@ -38,12 +38,16 @@ class Vehicle {
                                                const EnvironmentConfig& environmentConfig);
     WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
     WheelData<float> staticLoad(float earthAcc);
-    float calculateLatAcc(WheelData<float> tireForcesY);
+    float calculateLatAcc(const WheelData<float>& tireForcesX,
+                          const WheelData<float>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
     WheelData<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
     WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
     WheelData<float> loadTransfer(float latAcc);
-    WheelData<float> getVehicleFyFromTireFy(const WheelData<float> tireFy);
+    WheelData<float> getVehicleFyFromTireForces(const WheelData<float>& tireFx,
+                                                const WheelData<float>& tireFy);
+    WheelData<float> getVehicleFxFromTireForces(const WheelData<float>& tireFx,
+                                                const WheelData<float>& tireFy);
     VehicleState springing(WheelData<float> loads);   
    public:
     VehicleState* getState();
