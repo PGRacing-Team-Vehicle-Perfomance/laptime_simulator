@@ -9,8 +9,10 @@
 
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
+#include "vehicle/coordTypes.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/tire/tirePacejka.h"
+#include "vehicle/tireAdapter.h"
 #include "vehicle/vehicle.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -39,10 +41,10 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
         combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
         combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
-    tires.FL.position = {0, -frontTrackWidth / 2, 0};
-    tires.FR.position = {0, frontTrackWidth / 2, 0};
-    tires.RL.position = {trackDistance, -rearTrackWidth / 2, 0};
-    tires.RR.position = {trackDistance, rearTrackWidth / 2, 0};
+    tires.FL.position = {0, frontTrackWidth / 2, 0};   // ISO y=left: left = +y
+    tires.FR.position = {0, -frontTrackWidth / 2, 0};  // ISO y=left: right = -y
+    tires.RL.position = {trackDistance, rearTrackWidth / 2, 0};
+    tires.RR.position = {trackDistance, -rearTrackWidth / 2, 0};
 
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         combinedNonSuspendedMass.position.x += nonSuspendedMassAtWheels[i] * tires[i].position.x;
@@ -130,10 +132,11 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(loads[i], slipAngles[i], 0);
-            tireForcesX[i] = tires[i].value->getForce().value.x;
-            tireForcesY[i] = tires[i].value->getForce().value.y;
-            tireMomentsZ[i] = tires[i].value->getTorque().z;
+            auto out = TireAdapter::call(*tires[i].value, VerticalLoad<VehicleFrame>(loads[i]),
+                                         SlipAngle<VehicleFrame>(slipAngles[i]));
+            tireForcesX[i] = out.Fx;
+            tireForcesY[i] = out.Fy;
+            tireMomentsZ[i] = out.Mz;
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);
@@ -198,20 +201,21 @@ WheelData<float> Vehicle::calculateSlipAngles(float yawVelocity, Vec3<float> vel
 
     // Slip angle = wheel velocity angle - wheel heading angle
     // Wheel heading = steering angle + toe angle
+    // ISO y=left: FL/RL at +t/2, FR/RR at -t/2 → signs flip vs old y=right
     slipAngle.FL = std::atan((velocity.y + yawVelocity * massToFront) /
-                             (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
+                             (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
                    toRad(steeringAngles.FL) - toRad(toeAngle.FL);
 
     slipAngle.FR = std::atan((velocity.y + yawVelocity * massToFront) /
-                             (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
+                             (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
                    toRad(steeringAngles.FR) - toRad(toeAngle.FR);
 
     slipAngle.RL = std::atan((velocity.y - yawVelocity * massToRear) /
-                             (velocity.x - yawVelocity * rearTrackWidth / 2.0)) -
+                             (velocity.x + yawVelocity * rearTrackWidth / 2.0)) -
                    toRad(steeringAngles.RL) - toRad(toeAngle.RL);
 
     slipAngle.RR = std::atan((velocity.y - yawVelocity * massToRear) /
-                             (velocity.x + yawVelocity * rearTrackWidth / 2.0)) -
+                             (velocity.x - yawVelocity * rearTrackWidth / 2.0)) -
                    toRad(steeringAngles.RR) - toRad(toeAngle.RR);
 
     return slipAngle;
@@ -300,7 +304,7 @@ WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
     // known problem described in onenote:
     // cannot calculate distribution to 4 corners from one mass center
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
-    return distributeForces(-aero.value.getForce().value.z, aero.position.x, aero.position.y);
+    return distributeForces(aero.value.getForce().value.z, aero.position.x, aero.position.y);
 }
 
 WheelData<float> Vehicle::loadTransfer(float latAcc) {
@@ -335,10 +339,11 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
 
     WheelData<float> loads;
 
-    loads.FL = -frontTransfer;
-    loads.FR = frontTransfer;
-    loads.RL = -rearTransfer;
-    loads.RR = rearTransfer;
+    // ISO y=left: latAcc > 0 = leftward → left wheels (FL, RL) gain load
+    loads.FL = frontTransfer;
+    loads.FR = -frontTransfer;
+    loads.RL = rearTransfer;
+    loads.RR = -rearTransfer;
 
     return loads;
 }
