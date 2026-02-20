@@ -1,73 +1,112 @@
 #pragma once
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Canonical coordinate system: ISO8855Frame (= VehicleFrame)
+// =============================================================================
+// Coordinate frames, typed axis components, and rotation-based transforms
 //
-//   x — forward (front axle at x=0, rear axle at x=trackDistance)
-//   y — leftward (ISO 8855: FL/RL at y=+t/2, FR/RR at y=-t/2)
-//   z — upward
+// ISO 8855:  x=forward, y=left, z=up    (right-handed: fwd x left = up)
+// SAE J670:  x=forward, y=right, z=down (right-handed: fwd x right = down)
 //
-//   SlipAngle    > 0  → wheel velocity has leftward (+y) component vs heading
-//   LateralForce > 0  → leftward (+y)
-//   VerticalLoad > 0  → normal force magnitude (always positive, reaction force)
-//   YawMoment    > 0  → CCW from above (nose goes left)
-//   LatAcc       > 0  → leftward (+y)
+// Relation: ISO <-> SAE = 180 deg rotation about x-axis
+//   Axes:   x_SAE =  x_ISO,  y_SAE = -y_ISO,  z_SAE = -z_ISO
+//   Angles: alpha_SAE = -alpha_ISO (about z, flips)
+//           gamma_SAE =  gamma_ISO (about x, invariant)
+//           kappa_SAE = -kappa_ISO (about y, flips)
 //
-// SAEFrame: SAE J670 tire convention (used internally by TirePacejka)
-//   x=forward, y=right, z=down  (right-handed: forward×right=down ✓)
-//   SlipAngle > 0 → velocity to the RIGHT of wheel heading (CW about z=down)
-//                   opposite to ISO where α>0 = velocity to the LEFT
-//   Fy        > 0 → rightward (+y)
-//   Fz        > 0 → compressed (load INTO tire, z=down so downward = positive)
+// Rule: 180 deg rotation about axis A -> component along A unchanged,
+//       other two components flip sign. Applies to both axes and angles.
 //
-// Conversions ISO8855 ↔ SAE:
-//   toSAE(α):  negate rad  (ISO α>0=left, SAE α>0=right)
-//   toSAE(Fz): keep N as-is (both use magnitude/reaction convention)
-//   toISO(Fy): negate N    (SAE Fy>0=right, ISO Fy>0=left)
-//
-// Note: TirePacejka handles its own Side flips (Left/Right) internally.
-//       The adapter passes values directly — TirePacejka's internals absorb
-//       the remaining ISO→SAE conversion via the sign chain in slip angle calc.
-// ═══════════════════════════════════════════════════════════════════════════════
+// Typed vs raw:
+//   Typed (X<F>, Y<F>, Z<F>, Alpha<F>, Gamma<F>, Kappa<F>):
+//     -> has direction -> subject to rotation via Transform
+//   Raw (float):
+//     -> magnitude / scalar -> NOT subject to rotation
+//     Example: VerticalLoad is magnitude (always +), passed as float.
+//              Fy is directional force, passed as Y<Frame>.
+// =============================================================================
 
-struct ISO8855Frame {};  // x=fwd, y=left, z=up  (canonical vehicle frame)
-struct SAEFrame {};      // x=fwd, y=right, z=down  (SAE J670: forward×right=down)
+// -- Frames -------------------------------------------------------------------
+struct ISO8855 {};  // x=forward, y=left, z=up
+struct SAE {};      // x=forward, y=right, z=down
 
-// VehicleFrame is an alias for ISO8855Frame — used throughout the codebase.
-using VehicleFrame = ISO8855Frame;
-
+// -- Axis components (directional vector components) --------------------------
 template <typename Frame>
-struct SlipAngle {
-    float rad;
-    explicit SlipAngle(float r) : rad(r) {}
+struct X {
+    float v = 0;
+    X() = default;
+    explicit X(float val) : v(val) {}
 };
 
 template <typename Frame>
-struct LateralForce {
-    float N;
-    explicit LateralForce(float n) : N(n) {}
+struct Y {
+    float v = 0;
+    Y() = default;
+    explicit Y(float val) : v(val) {}
 };
 
 template <typename Frame>
-struct VerticalLoad {
-    float N;
-    explicit VerticalLoad(float n) : N(n) {}
+struct Z {
+    float v = 0;
+    Z() = default;
+    explicit Z(float val) : v(val) {}
 };
 
-enum class TireSide { Left, Right };
+// -- Angles (rotations about axes) --------------------------------------------
+// Alpha = rotation about z (yaw / slip angle)
+// Gamma = rotation about x (camber)
+// Kappa = rotation about y (inclination)
+template <typename Frame>
+struct Alpha {
+    float rad = 0;
+    Alpha() = default;
+    explicit Alpha(float r) : rad(r) {}
+};
 
-// ── Conversions at the ISO8855Frame ↔ SAEFrame boundary ─────────────────────
-// These are the ONLY place where coordinate system knowledge is encoded.
+template <typename Frame>
+struct Gamma {
+    float rad = 0;
+    Gamma() = default;
+    explicit Gamma(float r) : rad(r) {}
+};
 
-// ISO → SAE: negate slip angle (ISO α>0=left, SAE α>0=right)
-inline SlipAngle<SAEFrame> toSAE(SlipAngle<ISO8855Frame> a) { return SlipAngle<SAEFrame>(-a.rad); }
+template <typename Frame>
+struct Kappa {
+    float rad = 0;
+    Kappa() = default;
+    explicit Kappa(float r) : rad(r) {}
+};
 
-// ISO → SAE: vertical load magnitude is unchanged
-inline VerticalLoad<SAEFrame> toSAE(VerticalLoad<ISO8855Frame> l) {
-    return VerticalLoad<SAEFrame>(l.N);
-}
+// -- Rotation mechanism -------------------------------------------------------
+enum class Axis { X, Y, Z };
 
-// SAE → ISO: negate lateral force (SAE Fy>0=right, ISO Fy>0=left)
-inline LateralForce<ISO8855Frame> toISO(LateralForce<SAEFrame> f) {
-    return LateralForce<ISO8855Frame>(-f.N);
-}
+struct Rotation180 {
+    Axis axis;
+
+    // Axes: component along rotation axis -> unchanged, others -> flip
+    float x(float v) const { return axis == Axis::X ? v : -v; }
+    float y(float v) const { return axis == Axis::Y ? v : -v; }
+    float z(float v) const { return axis == Axis::Z ? v : -v; }
+
+    // Angles: angle about rotation axis -> unchanged, others -> flip
+    float alpha(float v) const { return axis == Axis::Z ? v : -v; }  // about z
+    float gamma(float v) const { return axis == Axis::X ? v : -v; }  // about x
+    float kappa(float v) const { return axis == Axis::Y ? v : -v; }  // about y
+};
+
+// -- Predefined rotations -----------------------------------------------------
+constexpr Rotation180 FLIP_YZ{Axis::X};  // 180 deg about x -> ISO<->SAE, Left<->Right tire
+
+// -- Transform between frames -------------------------------------------------
+template <typename From, typename To>
+struct Transform {
+    Rotation180 rotation;
+
+    X<To> operator()(X<From> v) const { return X<To>{rotation.x(v.v)}; }
+    Y<To> operator()(Y<From> v) const { return Y<To>{rotation.y(v.v)}; }
+    Z<To> operator()(Z<From> v) const { return Z<To>{rotation.z(v.v)}; }
+    Alpha<To> operator()(Alpha<From> a) const { return Alpha<To>{rotation.alpha(a.rad)}; }
+    Gamma<To> operator()(Gamma<From> g) const { return Gamma<To>{rotation.gamma(g.rad)}; }
+    Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.rad)}; }
+};
+
+constexpr Transform<ISO8855, SAE> isoToSae{FLIP_YZ};
+constexpr Transform<SAE, ISO8855> saeToIso{FLIP_YZ};  // 180 deg is its own inverse
