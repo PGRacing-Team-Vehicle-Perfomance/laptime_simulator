@@ -201,21 +201,23 @@ WheelData<float> Vehicle::calculateSlipAngles(float yawVelocity, Vec3<float> vel
 
     // Slip angle = wheel velocity angle - wheel heading angle
     // Wheel heading = steering angle + toe angle
-    // ISO y=left: FL/RL at +t/2, FR/RR at -t/2 → signs flip vs old y=right
+    // V_wheel.x = V_cg.x - ωz * r_wheel.y  (from ω×r cross product, ISO y=left)
+    // FL at y=+t_f/2  → denominator = v - ωz*(+t_f/2)
+    // FR at y=-t_f/2  → denominator = v - ωz*(-t_f/2) = v + ωz*t_f/2
     slipAngle.FL = std::atan((velocity.y + yawVelocity * massToFront) /
-                             (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
+                             (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
                    toRad(steeringAngles.FL) - toRad(toeAngle.FL);
 
     slipAngle.FR = std::atan((velocity.y + yawVelocity * massToFront) /
-                             (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
+                             (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
                    toRad(steeringAngles.FR) - toRad(toeAngle.FR);
 
     slipAngle.RL = std::atan((velocity.y - yawVelocity * massToRear) /
-                             (velocity.x + yawVelocity * rearTrackWidth / 2.0)) -
+                             (velocity.x - yawVelocity * rearTrackWidth / 2.0)) -
                    toRad(steeringAngles.RL) - toRad(toeAngle.RL);
 
     slipAngle.RR = std::atan((velocity.y - yawVelocity * massToRear) /
-                             (velocity.x - yawVelocity * rearTrackWidth / 2.0)) -
+                             (velocity.x + yawVelocity * rearTrackWidth / 2.0)) -
                    toRad(steeringAngles.RR) - toRad(toeAngle.RR);
 
     return slipAngle;
