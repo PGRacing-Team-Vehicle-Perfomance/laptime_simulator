@@ -1,34 +1,12 @@
 #pragma once
 
-// =============================================================================
-// Coordinate frames, typed axis components, and rotation-based transforms
-//
-// ISO 8855:  x=forward, y=left, z=up    (right-handed: fwd x left = up)
-// SAE J670:  x=forward, y=right, z=down (right-handed: fwd x right = down)
-//
-// Relation: ISO <-> SAE = 180 deg rotation about x-axis
-//   Axes:   x_SAE =  x_ISO,  y_SAE = -y_ISO,  z_SAE = -z_ISO
-//   Angles: alpha_SAE = -alpha_ISO (about z, flips)
-//           gamma_SAE =  gamma_ISO (about x, invariant)
-//           kappa_SAE = -kappa_ISO (about y, flips)
-//
-// Rule: 180 deg rotation about axis A -> component along A unchanged,
-//       other two components flip sign. Applies to both axes and angles.
-//
-// Typed vs raw:
-//   Typed (X<F>, Y<F>, Z<F>, Alpha<F>, Gamma<F>, Kappa<F>):
-//     -> has direction -> subject to rotation via Transform
-//   Raw (float):
-//     -> magnitude / scalar -> NOT subject to rotation
-//     Example: VerticalLoad is magnitude (always +), passed as float.
-//              Fy is directional force, passed as Y<Frame>.
-// =============================================================================
+// ISO 8855: x=fwd, y=left, z=up — SAE J670: x=fwd, y=right, z=down
+// Relation: 180° rotation about x (component along axis unchanged, others flip)
+// Typed (X<F>, Alpha<F>...) = directional, raw float = magnitude/scalar
 
-// -- Frames -------------------------------------------------------------------
-struct ISO8855 {};  // x=forward, y=left, z=up
-struct SAE {};      // x=forward, y=right, z=down
+struct ISO8855 {};
+struct SAE {};
 
-// -- Axis components (directional vector components) --------------------------
 template <typename Frame>
 struct X {
     float v = 0;
@@ -50,10 +28,6 @@ struct Z {
     explicit Z(float val) : v(val) {}
 };
 
-// -- Angles (rotations about axes) --------------------------------------------
-// Alpha = rotation about z (yaw / slip angle)
-// Gamma = rotation about x (camber)
-// Kappa = rotation about y (inclination)
 template <typename Frame>
 struct Alpha {
     float rad = 0;
@@ -75,27 +49,22 @@ struct Kappa {
     explicit Kappa(float r) : rad(r) {}
 };
 
-// -- Rotation mechanism -------------------------------------------------------
 enum class Axis { X, Y, Z };
 
 struct Rotation180 {
     Axis axis;
 
-    // Axes: component along rotation axis -> unchanged, others -> flip
     float x(float v) const { return axis == Axis::X ? v : -v; }
     float y(float v) const { return axis == Axis::Y ? v : -v; }
     float z(float v) const { return axis == Axis::Z ? v : -v; }
 
-    // Angles: angle about rotation axis -> unchanged, others -> flip
-    float alpha(float v) const { return axis == Axis::Z ? v : -v; }  // about z
-    float gamma(float v) const { return axis == Axis::X ? v : -v; }  // about x
-    float kappa(float v) const { return axis == Axis::Y ? v : -v; }  // about y
+    float alpha(float v) const { return axis == Axis::Z ? v : -v; }
+    float gamma(float v) const { return axis == Axis::X ? v : -v; }
+    float kappa(float v) const { return axis == Axis::Y ? v : -v; }
 };
 
-// -- Predefined rotations -----------------------------------------------------
-constexpr Rotation180 FLIP_YZ{Axis::X};  // 180 deg about x -> ISO<->SAE, Left<->Right tire
+constexpr Rotation180 FLIP_YZ{Axis::X};
 
-// -- Transform between frames -------------------------------------------------
 template <typename From, typename To>
 struct Transform {
     Rotation180 rotation;
@@ -109,4 +78,12 @@ struct Transform {
 };
 
 constexpr Transform<ISO8855, SAE> isoToSae{FLIP_YZ};
-constexpr Transform<SAE, ISO8855> saeToIso{FLIP_YZ};  // 180 deg is its own inverse
+constexpr Transform<SAE, ISO8855> saeToIso{FLIP_YZ};
+
+template <typename From, typename To>
+struct FrameBridge {
+    Transform<From, To> toTarget;
+    Transform<To, From> fromTarget;
+};
+
+constexpr FrameBridge<ISO8855, SAE> isoSae{isoToSae, saeToIso};

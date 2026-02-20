@@ -12,7 +12,7 @@
 #include "vehicle/coordTypes.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/tire/tirePacejka.h"
-#include "vehicle/tireAdapter.h"
+#include "vehicle/tireBridge.h"
 #include "vehicle/vehicle.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -132,7 +132,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            auto out = TireAdapter::call(*tires[i].value, loads[i], slipAngles[i]);
+            auto out = callTire(isoSae, *tires[i].value, loads[i], slipAngles[i]);
             tireForcesX[i] = out.Fx;
             tireForcesY[i] = out.Fy;
             tireMomentsZ[i] = out.Mz;

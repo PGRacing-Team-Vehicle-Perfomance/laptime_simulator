@@ -48,9 +48,9 @@ struct Vec3 {
 
 template <>
 struct Vec3<float> {
-    float x, y, z;
+    float x = 0, y = 0, z = 0;
 
-    Vec3() {};
+    Vec3() = default;
     Vec3(float x, float y, float z) : x(x), y(y), z(z) {};
     Vec3(float length, Angle phi, Angle theta) {
         float sinPhi = std::sin(phi.getRadians());

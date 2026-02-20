@@ -13,5 +13,5 @@ class TireSimple : public Tire {
    public:
     TireSimple() = default;
     TireSimple(const TireConfig& config, bool isDriven);
-    void calculate(float verticalLoad, float slipAngle, float slipRatio) override;
+    void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) override;
 };
