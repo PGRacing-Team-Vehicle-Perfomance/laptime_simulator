@@ -41,8 +41,8 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
         combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
         combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
-    tires.FL.position = {0, frontTrackWidth / 2, 0};   // ISO y=left: left = +y
-    tires.FR.position = {0, -frontTrackWidth / 2, 0};  // ISO y=left: right = -y
+    tires.FL.position = {0, frontTrackWidth / 2, 0};
+    tires.FR.position = {0, -frontTrackWidth / 2, 0};
     tires.RL.position = {trackDistance, rearTrackWidth / 2, 0};
     tires.RR.position = {trackDistance, -rearTrackWidth / 2, 0};
 
@@ -120,7 +120,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
 
     WheelData<X<ISO8855>> tireForcesX;
     WheelData<Y<ISO8855>> tireForcesY;
-    WheelData<float> tireMomentsZ{0, 0, 0, 0};
+    WheelData<Z<ISO8855>> tireMomentsZ;
     WheelData<Alpha<ISO8855>> slipAngles;
     Y<ISO8855> latAcc{0};
     float error;
@@ -129,7 +129,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
         iterations++;
-        slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
+        slipAngles = calculateSlipAngles(Alpha<ISO8855>{state.angular_velocity.z}, velocity);
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
             auto out = callTire(isoSae, *tires[i].value, loads[i], slipAngles[i]);
@@ -143,24 +143,21 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         latAcc = newLatAcc;
         state.angular_velocity.z = latAcc.v / state.velocity.getLength();
 
-        loads = totalTireLoads(latAcc.v, environmentConfig);
+        loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance && iterations < maxIterations);
 
     float yawMomentFromTires = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        yawMomentFromTires = yawMomentFromTires + tireMomentsZ[i];
+        yawMomentFromTires += tireMomentsZ[i].v;
     }
 
-    // Transform tire forces to vehicle coordinates
     auto vehicleFx = getVehicleFxFromTireForces(tireForcesX, tireForcesY);
     auto vehicleFy = getVehicleFyFromTireForces(tireForcesX, tireForcesY);
 
-    // Yaw moment from Fy (moment arm in X direction)
     float yawMomentFromFy =
         ((vehicleFy.FL.v + vehicleFy.FR.v) * combinedTotalMass.position.x) -
         ((vehicleFy.RL.v + vehicleFy.RR.v) * (trackDistance - combinedTotalMass.position.x));
 
-    // Yaw moment from Fx (moment arm in Y direction): Mz = -y * Fx
     float yawMomentFromFx = (frontTrackWidth / 2) * (vehicleFx.FL.v - vehicleFx.FR.v) +
                             (rearTrackWidth / 2) * (vehicleFx.RL.v - vehicleFx.RR.v);
 
@@ -174,53 +171,43 @@ VehicleState* Vehicle::getState() { return &state; }
 WheelData<float> Vehicle::calculateSteeringAngles() {
     float delta = state.steeringAngle;
 
-    // TODO: Ackermann - implement using ackermannPercentage
-    //   Formula: cot(δ_outer) - cot(δ_inner) = t/L
-    //   0% = parallel, 100% = ideal Ackermann
-    //   Alternative inputs: TOOT [deg], or direct angles from CAD
-    (void)ackermannPercentage;  // dummy - suppress unused warning
+    // TODO: Ackermann geometry
+    (void)ackermannPercentage;
     (void)trackDistance;
     (void)frontTrackWidth;
 
-    // Current: parallel steering
     return {.FL = delta, .FR = delta, .RL = 0, .RR = 0};
 }
 
-WheelData<Alpha<ISO8855>> Vehicle::calculateSlipAngles(float yawVelocity, Vec3<float> velocity) {
+WheelData<Alpha<ISO8855>> Vehicle::calculateSlipAngles(Alpha<ISO8855> yawRate,
+                                                      Vec3<float> velocity) {
+    float wz = yawRate.rad;
     float massToFront = combinedTotalMass.position.x;
     float massToRear = trackDistance - massToFront;
 
-    // Get steering angles with Ackermann effect
     auto steeringAngles = calculateSteeringAngles();
-
-    // Convert toe and steering to radians
     auto toRad = [](float deg) { return deg * M_PI / 180.0f; };
 
     WheelData<Alpha<ISO8855>> slipAngle;
 
-    // Slip angle = wheel velocity angle - wheel heading angle
-    // Wheel heading = steering angle + toe angle
-    // V_wheel.x = V_cg.x - ωz * r_wheel.y  (from ω×r cross product, ISO y=left)
-    // FL at y=+t_f/2  → denominator = v - ωz*(+t_f/2)
-    // FR at y=-t_f/2  → denominator = v - ωz*(-t_f/2) = v + ωz*t_f/2
     slipAngle.FL = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y + yawVelocity * massToFront) /
-                                     (velocity.x - yawVelocity * frontTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y + wz * massToFront) /
+                                     (velocity.x - wz * frontTrackWidth / 2.0)) -
                            toRad(steeringAngles.FL) - toRad(toeAngle.FL))};
 
     slipAngle.FR = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y + yawVelocity * massToFront) /
-                                     (velocity.x + yawVelocity * frontTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y + wz * massToFront) /
+                                     (velocity.x + wz * frontTrackWidth / 2.0)) -
                            toRad(steeringAngles.FR) - toRad(toeAngle.FR))};
 
     slipAngle.RL = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y - yawVelocity * massToRear) /
-                                     (velocity.x - yawVelocity * rearTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y - wz * massToRear) /
+                                     (velocity.x - wz * rearTrackWidth / 2.0)) -
                            toRad(steeringAngles.RL) - toRad(toeAngle.RL))};
 
     slipAngle.RR = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y - yawVelocity * massToRear) /
-                                     (velocity.x + yawVelocity * rearTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y - wz * massToRear) /
+                                     (velocity.x + wz * rearTrackWidth / 2.0)) -
                            toRad(steeringAngles.RR) - toRad(toeAngle.RR))};
 
     return slipAngle;
@@ -272,7 +259,8 @@ WheelData<X<ISO8855>> Vehicle::getVehicleFxFromTireForces(const WheelData<X<ISO8
     return vehicleFx;
 }
 
-WheelData<float> Vehicle::totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig) {
+WheelData<float> Vehicle::totalTireLoads(Y<ISO8855> latAcc,
+                                        const EnvironmentConfig& environmentConfig) {
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig);
     auto transfer = loadTransfer(latAcc);
@@ -305,37 +293,37 @@ WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, fl
 }
 
 WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
-    // known problem described in onenote:
-    // cannot calculate distribution to 4 corners from one mass center
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
-    // force.z > 0 = lift (cla sign bug), negate so positive totalForce = pushdown on tires
+    // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
     return distributeForces(-aero.value.getForce().value.z, aero.position.x, aero.position.y);
 }
 
-WheelData<float> Vehicle::loadTransfer(float latAcc) {
+WheelData<float> Vehicle::loadTransfer(Y<ISO8855> latAcc) {
+    float ay = latAcc.v;
+
     float nonSuspendedMassFront = combinedNonSuspendedMass.value *
                                   (trackDistance - combinedNonSuspendedMass.position.x) /
                                   trackDistance;
     float nonSuspendedMassRear = combinedNonSuspendedMass.value - nonSuspendedMassFront;
 
     float nonSuspendedWTFront =
-        nonSuspendedMassFront * latAcc * combinedNonSuspendedMass.position.z / frontTrackWidth;
+        nonSuspendedMassFront * ay * combinedNonSuspendedMass.position.z / frontTrackWidth;
     float nonSuspendedWTRear =
-        nonSuspendedMassRear * latAcc * combinedNonSuspendedMass.position.z / rearTrackWidth;
+        nonSuspendedMassRear * ay * combinedNonSuspendedMass.position.z / rearTrackWidth;
 
     float suspendedMassFront = combinedSuspendedMass.value *
                                (trackDistance - combinedSuspendedMass.position.x) / trackDistance;
     float suspendedMassRear = combinedSuspendedMass.value - suspendedMassFront;
 
-    float geometricWTFront = suspendedMassFront * latAcc * rollCenterHeightFront / frontTrackWidth;
-    float geometricWTRear = suspendedMassRear * latAcc * rollCenterHeightBack / rearTrackWidth;
+    float geometricWTFront = suspendedMassFront * ay * rollCenterHeightFront / frontTrackWidth;
+    float geometricWTRear = suspendedMassRear * ay * rollCenterHeightBack / rearTrackWidth;
 
     float antiRollStiffnessTotal = antiRollStiffnessFront + antiRollStiffnessRear;
 
-    float elasticWTFront = suspendedMassFront * latAcc *
+    float elasticWTFront = suspendedMassFront * ay *
                            (combinedSuspendedMass.position.z - rollCenterHeightFront) *
                            (antiRollStiffnessFront / antiRollStiffnessTotal) / frontTrackWidth;
-    float elasticWTRear = suspendedMassRear * latAcc *
+    float elasticWTRear = suspendedMassRear * ay *
                           (combinedSuspendedMass.position.z - rollCenterHeightBack) *
                           (antiRollStiffnessRear / antiRollStiffnessTotal) / rearTrackWidth;
 
@@ -344,7 +332,6 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
 
     WheelData<float> loads;
 
-    // latAcc > 0 = leftward → body rolls right → RIGHT wheels gain load
     loads.FL = -frontTransfer;
     loads.FR = frontTransfer;
     loads.RL = -rearTransfer;

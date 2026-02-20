@@ -53,6 +53,6 @@ void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slip
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{FySAE}, .Mz = 0};
+    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{FySAE}, .Mz = Z<SAE>{0}};
     force.value.y = FySAE;
 }

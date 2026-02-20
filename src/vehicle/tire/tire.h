@@ -7,7 +7,7 @@
 struct TireOutput {
     X<SAE> Fx{0};
     Y<SAE> Fy{0};
-    float Mz = 0;
+    Z<SAE> Mz{0};
 };
 
 class Tire: public ForcefullObject, public TorquedObject {

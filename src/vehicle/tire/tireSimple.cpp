@@ -21,6 +21,6 @@ void TireSimple::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipR
     force = {};
     torque = {};
     float Fy = calculateForce(verticalLoad, true);
-    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{Fy}, .Mz = 0};
+    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{Fy}, .Mz = Z<SAE>{0}};
     force.value.y = Fy;
 }
