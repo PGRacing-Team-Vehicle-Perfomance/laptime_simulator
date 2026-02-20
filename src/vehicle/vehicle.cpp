@@ -9,7 +9,7 @@
 
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
-#include "vehicle/coordTypes.h"
+#include "coordTypes.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/tire/tirePacejka.h"
 #include "vehicle/tireBridge.h"

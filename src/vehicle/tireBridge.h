@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vehicle/coordTypes.h"
+#include "coordTypes.h"
 #include "vehicle/tire/tire.h"
 
 template <typename From, typename To>

@@ -7,7 +7,7 @@
 
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
-#include "vehicle/coordTypes.h"
+#include "coordTypes.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
