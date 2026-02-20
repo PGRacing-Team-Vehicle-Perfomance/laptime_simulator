@@ -139,7 +139,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);
         error = std::abs(latAcc - newLatAcc);
         latAcc = newLatAcc;
-        state.angular_velocity.z = latAcc / velocity.x;
+        state.angular_velocity.z = latAcc / state.velocity.getLength();
 
         loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance && iterations < maxIterations);
