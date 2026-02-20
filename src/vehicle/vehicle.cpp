@@ -308,7 +308,8 @@ WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
     // known problem described in onenote:
     // cannot calculate distribution to 4 corners from one mass center
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
-    return distributeForces(aero.value.getForce().value.z, aero.position.x, aero.position.y);
+    // force.z > 0 = lift (cla sign bug), negate so positive totalForce = pushdown on tires
+    return distributeForces(-aero.value.getForce().value.z, aero.position.x, aero.position.y);
 }
 
 WheelData<float> Vehicle::loadTransfer(float latAcc) {
@@ -343,11 +344,11 @@ WheelData<float> Vehicle::loadTransfer(float latAcc) {
 
     WheelData<float> loads;
 
-    // ISO y=left: latAcc > 0 = leftward → left wheels (FL, RL) gain load
-    loads.FL = frontTransfer;
-    loads.FR = -frontTransfer;
-    loads.RL = rearTransfer;
-    loads.RR = -rearTransfer;
+    // latAcc > 0 = leftward → body rolls right → RIGHT wheels gain load
+    loads.FL = -frontTransfer;
+    loads.FR = frontTransfer;
+    loads.RL = -rearTransfer;
+    loads.RR = rearTransfer;
 
     return loads;
 }
