@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 // ISO 8855: x=fwd, y=left, z=up — SAE J670: x=fwd, y=right, z=down
 // Relation: 180° rotation about x (component along axis unchanged, others flip)
 // Typed (X<F>, Alpha<F>...) = directional, raw float = magnitude/scalar
@@ -49,6 +51,30 @@ struct Kappa {
     explicit Kappa(float r) : rad(r) {}
 };
 
+template <typename Frame>
+struct Vec {
+    X<Frame> x;
+    Y<Frame> y;
+    Z<Frame> z;
+
+    Vec() = default;
+    Vec(X<Frame> x, Y<Frame> y, Z<Frame> z) : x(x), y(y), z(z) {}
+
+    float getLength() const { return std::sqrt(x.v * x.v + y.v * y.v + z.v * z.v); }
+
+    void setLength(float newLength) {
+        float current = getLength();
+        if (current == 0.0f) {
+            x.v = newLength;
+            return;
+        }
+        float scale = newLength / current;
+        x.v *= scale;
+        y.v *= scale;
+        z.v *= scale;
+    }
+};
+
 enum class Axis { X, Y, Z };
 
 struct Rotation180 {
@@ -75,6 +101,9 @@ struct Transform {
     Alpha<To> operator()(Alpha<From> a) const { return Alpha<To>{rotation.alpha(a.rad)}; }
     Gamma<To> operator()(Gamma<From> g) const { return Gamma<To>{rotation.gamma(g.rad)}; }
     Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.rad)}; }
+    Vec<To> operator()(Vec<From> v) const {
+        return {(*this)(v.x), (*this)(v.y), (*this)(v.z)};
+    }
 };
 
 constexpr Transform<ISO8855, SAE> isoToSae{FLIP_YZ};

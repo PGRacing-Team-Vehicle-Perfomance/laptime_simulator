@@ -100,7 +100,7 @@ std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
         for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle;
              chassisSlipAngle += slipAngleStep) {
             state.rotation.z = Angle(static_cast<float>(chassisSlipAngle));
-            state.angular_velocity = {0, 0, 0};
+            state.angular_velocity = {};
             std::array<float, 2> diagramPoint =
                 getLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
             out.push_back(
@@ -113,10 +113,10 @@ std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
 std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                     const EnvironmentConfig& environmentConfig) {
     Angle beta = state.rotation.z;
-    Vec3f velocity;
-    velocity.x = state.velocity.getLength() * std::cos(beta.getRadians());
-    velocity.y = state.velocity.getLength() * std::sin(beta.getRadians());
-    velocity.z = 0;
+    Vec<ISO8855> velocity;
+    velocity.x = X<ISO8855>{state.velocity.getLength() * std::cos(beta.getRadians())};
+    velocity.y = Y<ISO8855>{state.velocity.getLength() * std::sin(beta.getRadians())};
+    velocity.z = Z<ISO8855>{0};
 
     WheelData<X<ISO8855>> tireForcesX;
     WheelData<Y<ISO8855>> tireForcesY;
@@ -129,7 +129,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
         iterations++;
-        slipAngles = calculateSlipAngles(Alpha<ISO8855>{state.angular_velocity.z}, velocity);
+        slipAngles = calculateSlipAngles(Alpha<ISO8855>{state.angular_velocity.z.v}, velocity);
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
             auto out = callTire(isoSae, *tires[i].value, loads[i], slipAngles[i]);
@@ -141,7 +141,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);
         error = std::abs(latAcc.v - newLatAcc.v);
         latAcc = newLatAcc;
-        state.angular_velocity.z = latAcc.v / state.velocity.getLength();
+        state.angular_velocity.z = Z<ISO8855>{latAcc.v / state.velocity.getLength()};
 
         loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance && iterations < maxIterations);
@@ -180,7 +180,7 @@ WheelData<float> Vehicle::calculateSteeringAngles() {
 }
 
 WheelData<Alpha<ISO8855>> Vehicle::calculateSlipAngles(Alpha<ISO8855> yawRate,
-                                                      Vec3<float> velocity) {
+                                                      Vec<ISO8855> velocity) {
     float wz = yawRate.rad;
     float massToFront = combinedTotalMass.position.x;
     float massToRear = trackDistance - massToFront;
@@ -191,23 +191,23 @@ WheelData<Alpha<ISO8855>> Vehicle::calculateSlipAngles(Alpha<ISO8855> yawRate,
     WheelData<Alpha<ISO8855>> slipAngle;
 
     slipAngle.FL = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y + wz * massToFront) /
-                                     (velocity.x - wz * frontTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y.v + wz * massToFront) /
+                                     (velocity.x.v - wz * frontTrackWidth / 2.0)) -
                            toRad(steeringAngles.FL) - toRad(toeAngle.FL))};
 
     slipAngle.FR = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y + wz * massToFront) /
-                                     (velocity.x + wz * frontTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y.v + wz * massToFront) /
+                                     (velocity.x.v + wz * frontTrackWidth / 2.0)) -
                            toRad(steeringAngles.FR) - toRad(toeAngle.FR))};
 
     slipAngle.RL = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y - wz * massToRear) /
-                                     (velocity.x - wz * rearTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y.v - wz * massToRear) /
+                                     (velocity.x.v - wz * rearTrackWidth / 2.0)) -
                            toRad(steeringAngles.RL) - toRad(toeAngle.RL))};
 
     slipAngle.RR = Alpha<ISO8855>{
-        static_cast<float>(std::atan((velocity.y - wz * massToRear) /
-                                     (velocity.x + wz * rearTrackWidth / 2.0)) -
+        static_cast<float>(std::atan((velocity.y.v - wz * massToRear) /
+                                     (velocity.x.v + wz * rearTrackWidth / 2.0)) -
                            toRad(steeringAngles.RR) - toRad(toeAngle.RR))};
 
     return slipAngle;
@@ -295,7 +295,7 @@ WheelData<float> Vehicle::distributeForces(float totalForce, float frontDist, fl
 WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
     // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
-    return distributeForces(-aero.value.getForce().value.z, aero.position.x, aero.position.y);
+    return distributeForces(-aero.value.getForce().value.z.v, aero.position.x, aero.position.y);
 }
 
 WheelData<float> Vehicle::loadTransfer(Y<ISO8855> latAcc) {

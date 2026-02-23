@@ -10,7 +10,7 @@ struct EnvironmentConfig {
     float airHumidity = 50;                                                     // [%]
     float airDensity = ::airDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                      // [m/s²]
-    Vec3f wind = {0, 0, 0};  //  amplitude [m/s] , angle [°] 0 = from North
+    Vec<ISO8855> wind;  //  amplitude [m/s] , angle [°] 0 = from North
 };
 
 struct VehicleConfig {
@@ -48,7 +48,7 @@ struct VehicleConfig {
     float cla = 3.7;
 
     // {0 0} geometric center of front axel
-    Vec3f claPosition = {0.75, 0.0, 0.0};  // change to % maby
+    Position claPosition = {0.75, 0.0, 0.0};  // change to % maby
 };
 
 // TODO: split into different configs for simple and pacejka and create implementation based on

@@ -54,5 +54,4 @@ void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slip
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
     output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{FySAE}, .Mz = Z<SAE>{0}};
-    force.value.y = FySAE;
 }
