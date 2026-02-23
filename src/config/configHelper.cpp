@@ -14,7 +14,7 @@ inline float airDensity(float airTemperature = 20, float airPressure = 100,
 
     // partial pressures
     float pVapor = (relativeHumidity / 100.0f) * pSat;
-    float pDry = airPressure - pVapor;
+    float pDry = airPressure * 1000.0f - pVapor;
     float airDensity = (pDry / (R_DRY * tempKelvin)) + (pVapor / (R_VAPOR * tempKelvin));
 
     return airDensity;
