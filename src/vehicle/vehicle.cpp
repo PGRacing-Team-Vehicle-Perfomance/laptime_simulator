@@ -11,8 +11,8 @@
 #include "vehicle/aero/aero.h"
 #include "coordTypes.h"
 #include "vehicle/tire/tire.h"
+#include "vehicle/tire/tireBridge.h"
 #include "vehicle/tire/tirePacejka.h"
-#include "vehicle/tireBridge.h"
 #include "vehicle/vehicle.h"
 #include "vehicle/vehicleHelper.h"
 
