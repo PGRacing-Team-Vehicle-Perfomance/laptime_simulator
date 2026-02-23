@@ -31,5 +31,5 @@ class TirePacejka : public Tire {
    public:
     TirePacejka() = default;
     TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle);
-    void calculate(float verticalLoad, float slipAngle, float slipRatio) override;
+    void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) override;
 };

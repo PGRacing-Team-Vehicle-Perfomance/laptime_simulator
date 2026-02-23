@@ -7,6 +7,7 @@
 
 #include "config/config.h"
 #include "vehicle/aero/aero.h"
+#include "coordTypes.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -28,6 +29,10 @@ class Vehicle {
     float frontTrackWidth;
     float rearTrackWidth;
     float trackDistance;
+
+    WheelData<float> toeAngle;
+    float ackermannPercentage;
+
     VehicleState state;
 
     Positioned<Aero> aero;
@@ -36,14 +41,19 @@ class Vehicle {
     
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations, 
                                                const EnvironmentConfig& environmentConfig);
-    WheelData<float> calculateSlipAngles(float r, Vec3<float> velocity);
+    WheelData<Alpha<ISO8855>> calculateSlipAngles(Alpha<ISO8855> yawRate, Vec<ISO8855> velocity);
+    WheelData<float> calculateSteeringAngles();
     WheelData<float> staticLoad(float earthAcc);
-    float calculateLatAcc(WheelData<float> tireForcesY);
+    Y<ISO8855> calculateLatAcc(const WheelData<X<ISO8855>>& tireForcesX,
+                               const WheelData<Y<ISO8855>>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    WheelData<float> totalTireLoads(float latAcc, const EnvironmentConfig& environmentConfig);
+    WheelData<float> totalTireLoads(Y<ISO8855> latAcc, const EnvironmentConfig& environmentConfig);
     WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
-    WheelData<float> loadTransfer(float latAcc);
-    WheelData<float> getVehicleFyFromTireFy(const WheelData<float> tireFy);
+    WheelData<float> loadTransfer(Y<ISO8855> latAcc);
+    WheelData<Y<ISO8855>> getVehicleFyFromTireForces(const WheelData<X<ISO8855>>& tireFx,
+                                                     const WheelData<Y<ISO8855>>& tireFy);
+    WheelData<X<ISO8855>> getVehicleFxFromTireForces(const WheelData<X<ISO8855>>& tireFx,
+                                                     const WheelData<Y<ISO8855>>& tireFy);
     VehicleState springing(WheelData<float> loads);   
    public:
     VehicleState* getState();

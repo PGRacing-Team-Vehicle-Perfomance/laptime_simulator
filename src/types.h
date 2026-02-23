@@ -7,6 +7,8 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include "coordTypes.h"
+
 class Angle {
     float value;
 
@@ -48,9 +50,9 @@ struct Vec3 {
 
 template <>
 struct Vec3<float> {
-    float x, y, z;
+    float x = 0, y = 0, z = 0;
 
-    Vec3() {};
+    Vec3() = default;
     Vec3(float x, float y, float z) : x(x), y(y), z(z) {};
     Vec3(float length, Angle phi, Angle theta) {
         float sinPhi = std::sin(phi.getRadians());
@@ -104,10 +106,16 @@ struct Vec3<float> {
 
 using Vec3f = Vec3<float>;
 
+struct Position {
+    float x = 0, y = 0, z = 0;
+    Position() = default;
+    Position(float x, float y, float z) : x(x), y(y), z(z) {}
+};
+
 template <typename T>
 struct Positioned {
     T value;
-    Vec3f position;
+    Position position;
 
     // Positioned<T> operator+(Positioned<T> rhs);
     // Positioned<T> operator-(Positioned<T> rhs);
@@ -117,8 +125,8 @@ struct Positioned {
 };
 
 using Mass = Positioned<float>;
-using Force = Positioned<Vec3f>;
-using Torque = Vec3f;
+using Force = Positioned<Vec<ISO8855>>;
+using Torque = Vec<ISO8855>;
 
 class MassiveObject {
    protected:

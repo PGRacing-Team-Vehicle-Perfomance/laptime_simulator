@@ -10,7 +10,7 @@ struct EnvironmentConfig {
     float airHumidity = 50;                                                     // [%]
     float airDensity = ::airDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
     float earthAcc = 9.81;                                                      // [m/s²]
-    Vec3f wind = {0, 0, 0};  //  amplitude [m/s] , angle [°] 0 = from North
+    Vec<ISO8855> wind;  //  amplitude [m/s] , angle [°] 0 = from North
 };
 
 struct VehicleConfig {
@@ -36,13 +36,23 @@ struct VehicleConfig {
     float rearTrackWidth = 1.216;
     float trackDistance = 1.53;
 
+    // Toe angles [deg] - positive = toe-in, negative = toe-out
+    WheelData<float> toeAngle = {.FL = 0, .FR = 0, .RL = 0, .RR = 0};
+
+    // TODO: Ackermann - implement as one of:
+    //   - Ackermann %: 0=parallel, 100=ideal (cot(δ_o)-cot(δ_i)=t/L)
+    //   - TOOT [deg] at reference angle [deg]
+    //   - Direct inner/outer angles from CAD
+    float ackermannPercentage = 0;  // [%] dummy - not implemented
+
     float cla = 3.7;
 
     // {0 0} geometric center of front axel
-    Vec3f claPosition = {0.75, 0.0, 0.0};  // change to % maby
+    Position claPosition = {0.75, 0.0, 0.0};  // change to % maby
 };
 
-// TODO: split into different configs for simple and pacejka and create implementation based on provided
+// TODO: split into different configs for simple and pacejka and create implementation based on
+// provided
 struct TireConfig {
     float scalingFac = 0.75;
     float quadFac = -0.0002;
