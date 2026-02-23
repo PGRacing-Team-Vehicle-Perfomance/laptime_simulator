@@ -106,16 +106,10 @@ struct Vec3<float> {
 
 using Vec3f = Vec3<float>;
 
-struct Position {
-    float x = 0, y = 0, z = 0;
-    Position() = default;
-    Position(float x, float y, float z) : x(x), y(y), z(z) {}
-};
-
 template <typename T>
 struct Positioned {
     T value;
-    Position position;
+    Position<ISO8855> position;
 
     // Positioned<T> operator+(Positioned<T> rhs);
     // Positioned<T> operator-(Positioned<T> rhs);

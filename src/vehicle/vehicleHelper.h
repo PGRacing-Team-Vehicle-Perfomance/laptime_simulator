@@ -54,7 +54,7 @@ struct RotationalState {
 
 struct LinearState {
     Vec<ISO8855> velocity;
-    Position position;
+    Position<ISO8855> position;
 };
 
 struct VehicleState : LinearState, RotationalState {

@@ -48,7 +48,7 @@ struct VehicleConfig {
     float cla = 3.7;
 
     // {0 0} geometric center of front axel
-    Position claPosition = {0.75, 0.0, 0.0};  // change to % maby
+    Position<ISO8855> claPosition = {0.75, 0.0, 0.0};  // change to % maby
 };
 
 // TODO: split into different configs for simple and pacejka and create implementation based on
