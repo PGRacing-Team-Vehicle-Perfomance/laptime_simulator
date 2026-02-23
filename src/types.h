@@ -28,12 +28,12 @@ class Angle {
     Angle operator-(float rhs) const { return Angle(value - rhs); }
 
     Angle& operator+=(float rhs) {
-        //value = normalize(value + rhs);
+        // value = normalize(value + rhs);
         value += rhs;
         return *this;
     }
     Angle& operator-=(float rhs) {
-        //value = normalize(value - rhs);
+        // value = normalize(value - rhs);
         value -= rhs;
         return *this;
     }
@@ -73,13 +73,11 @@ struct Vec3<float> {
         return Angle::fromRadians(std::acos(z / len));
     }
 
-    const Angle getTheta() const {
-        return Angle::fromRadians(std::atan2(y, x));
-    }
+    const Angle getTheta() const { return Angle::fromRadians(std::atan2(y, x)); }
 
     void setLength(float newLength) {
         float current = getLength();
-        
+
         if (current == 0.0f) {
             x = newLength;
             return;
@@ -106,10 +104,10 @@ struct Vec3<float> {
 
 using Vec3f = Vec3<float>;
 
-template <typename T>
+template <typename T, typename Frame = ISO8855>
 struct Positioned {
     T value;
-    Position<ISO8855> position;
+    Position<Frame> position;
 
     // Positioned<T> operator+(Positioned<T> rhs);
     // Positioned<T> operator-(Positioned<T> rhs);
@@ -125,6 +123,7 @@ using Torque = Vec<ISO8855>;
 class MassiveObject {
    protected:
     Mass mass;
+
    public:
     Mass getMass() { return mass; }
 };
@@ -132,6 +131,7 @@ class MassiveObject {
 class ForcefullObject {
    protected:
     Force force;
+
    public:
     Force getForce() { return force; }
 };
@@ -139,6 +139,7 @@ class ForcefullObject {
 class TorquedObject {
    protected:
     Torque torque;
+
    public:
     Torque getTorque() { return torque; }
 };
