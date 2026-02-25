@@ -88,11 +88,14 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
 }
 
 std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
-            const EnvironmentConfig& environmentConfig, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance, int maxIterations) {
+    const EnvironmentConfig& environmentConfig, float maxSteeringAngle, float steeringAngleStep,
+    float maxSlipAngle, float slipAngleStep, float tolerance, int maxIterations) {
     std::vector<std::array<float, 4>> out;
-    for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle; steeringAngle += steeringAngleStep) {
+    for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
+         steeringAngle += steeringAngleStep) {
         state.steeringAngle = static_cast<float>(steeringAngle);
-        for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle; chassisSlipAngle += slipAngleStep) {
+        for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle;
+             chassisSlipAngle += slipAngleStep) {
             state.rotation.z = Angle(static_cast<float>(chassisSlipAngle));
             state.angular_velocity = {0, 0, 0};
             std::array<float, 2> diagramPoint =
@@ -113,7 +116,6 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     velocity.z = 0;
 
     WheelData<float> tireForcesY;
-    WheelData<float> tireMomentsY{0,0,0,0};
     WheelData<float> slipAngles;
     float latAcc = 0;
     float error;
@@ -125,7 +127,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         slipAngles = calculateSlipAngles(state.angular_velocity.z, velocity);
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(loads[i], slipAngles[i], 0);
+            tires[i].value->calculate(loads[i], 0, slipAngles[i], 0);
             tireForcesY[i] = tires[i].value->getForce().value.y;
         }
 
@@ -139,7 +141,7 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
 
     float mz = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        mz = mz + tireMomentsY[i] + tires[i].value->getTorque().y;
+        mz += tires[i].value->getTorque().z;
     }
 
     // TODO:

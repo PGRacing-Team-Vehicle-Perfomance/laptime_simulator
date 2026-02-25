@@ -4,6 +4,8 @@
 #include "types.h"
 #include "vehicle/vehicleHelper.h"
 
+#include <string>
+
 struct EnvironmentConfig {
     float airTemperature = 20;                                                  // [°C]
     float airPressure = 100;                                                    // [kPa]
@@ -48,25 +50,7 @@ struct TireConfig {
     float quadFac = -0.0002;
     float linFac = 1.8284;
 
-    float PCY1 = 1.73993;
-    float PDY1 = 3.22192;
-    float PDY2 = 0.555412;
-    float PDY3 = 8.02593;
-    float PEY1 = 0.105808;
-    float PEY2 = -0.533932;
-    float PEY3 = 0.155092;
-    float PEY4 = 0.0330982;
-    float PKY1 = 31.8856;
-    float PKY2 = 2.01131;
-    float PKY3 = -0.0809452;
-    float PHY1 = 0.0605117;
-    float PHY2 = 0.0486026;
-    float PHY3 = -0.1913;
-    float PVY1 = 0.132828;
-    float PVY2 = 0.0325854;
-    float PVY3 = 2.70149;
-    float PVY4 = 1.12197;
-    float FNOMIN = 3000;
+    std::string pacejkaParams = "Parameters.txt";
 };
 
 struct SkidPadConfig {

@@ -17,7 +17,6 @@ float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
     return 0;
 }
 
-void TireSimple::calculate(float verticalLoad, float slipAngle, float slipRatio) {
-    force.value.y = calculateForce(verticalLoad, true);
-    // force.value.x = calculateForce(verticalLoad, false);
+void TireSimple::calculate(float Fz, float camber, float slipAngel, float slipRatio) {
+    force.value.y = calculateForce(Fz, true);
 }
