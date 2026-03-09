@@ -34,6 +34,7 @@ TirePacejka::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelat
       FNOMIN(config.FNOMIN) {}
 
 void TirePacejka::calculate(float verticalLoad, float slipAngle, float slipRatio) {
+    //if(verticalLoad > 2800) std::cout<<"gowno/n"<<std::endl;
     float Fz = -verticalLoad;                                               // [N]
     float alpha = sideRelativeToVehicle == Left ? slipAngle : -slipAngle;  // [rad]
     float gamma = 0;                                                       // [rad]

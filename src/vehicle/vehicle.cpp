@@ -52,7 +52,7 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
     }
     combinedNonSuspendedMass.position.x /= combinedNonSuspendedMass.value;
     combinedNonSuspendedMass.position.y /= combinedNonSuspendedMass.value;
-    combinedNonSuspendedMass.position.z = 0;
+    combinedNonSuspendedMass.position.z = 0.2;
 
     combinedSuspendedMass.position.x /= combinedSuspendedMass.value;
     combinedSuspendedMass.position.y /= combinedSuspendedMass.value;
@@ -130,13 +130,17 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesY);
-        error = std::abs(latAcc - newLatAcc);
+        error = std::abs((latAcc - newLatAcc) / newLatAcc);
         latAcc = newLatAcc;
-        state.angular_velocity.z = latAcc / velocity.x;
+        state.angular_velocity.z = -1*latAcc / state.velocity.getLength();//velocity.x; // total velocity . length()
 
         loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance && iterations < maxIterations);
 
+    if(iterations >= maxIterations) {
+        std::cout << "chujowo"<<std::endl;
+        //return {0,0};
+    }
     float mz = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         mz = mz + tireMomentsY[i] + tires[i].value->getTorque().y;
@@ -146,9 +150,11 @@ std::array<float, 2> Vehicle::getLatAccAndYawMoment(float tolerance, int maxIter
     // aero yaw moment
     // tire fx * r
     auto vehicleFy = getVehicleFyFromTireFy(tireForcesY);
+    // vrhicleFx
     float yawMoment =
-        ((vehicleFy.FL + vehicleFy.FR) * combinedTotalMass.position.x) -
+        - ((vehicleFy.FL + vehicleFy.FR) * combinedTotalMass.position.x) +
         ((vehicleFy.RL + vehicleFy.RR) * (trackDistance - combinedTotalMass.position.x)) + mz;
+        //moment from vehicleFx
     return {latAcc, yawMoment};
 }
 
@@ -232,7 +238,7 @@ WheelData<float> Vehicle::aeroLoad(const EnvironmentConfig& environmentConfig) {
     // known problem described in onenote:
     // cannot calculate distribution to 4 corners from one mass center
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
-    return distributeForces(-aero.value.getForce().value.z, aero.position.x, aero.position.y);
+    return distributeForces(aero.value.getForce().value.z, aero.position.x, aero.position.y);
 }
 
 WheelData<float> Vehicle::loadTransfer(float latAcc) {

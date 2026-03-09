@@ -55,7 +55,7 @@ def main():
     # Add scatter points on top
     x_all = [p['latAcc'] for p in data]
     y_all = [p['yawMoment'] for p in data]
-    plt.scatter(x_all, y_all, s=6, zorder=5)
+    plt.scatter(x_all, y_all, s=1, zorder=5)
     
     plt.xlabel('Lateral acceleration')
     plt.ylabel('Yaw moment')
