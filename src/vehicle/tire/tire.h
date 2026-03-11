@@ -4,13 +4,26 @@
 #include "coordTypes.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename Frame = ISO8855>
-class Tire : public ForcefullObject<Frame>, public TorquedObject<Frame> {
+template <typename Internal = ISO8855, typename External = ISO8855>
+class Tire : public ForcefullObject<External>, public TorquedObject<External> {
+    using ForcefullObject<External>::force;
+    using TorquedObject<External>::torque;
+    Transform<External, Internal> toInternal{FLIP_YZ};
+    Transform<Internal, External> toExternal{FLIP_YZ};
+
    protected:
     bool isDriven;
+    Force<Internal> internalForce;
+    Torque<Internal> internalTorque;
+    virtual void calculateInternal(float load, Alpha<Internal> slip, float slipRatio) = 0;
 
    public:
     Tire() = default;
-    Tire(const TireConfig& config, bool isDriven) : isDriven(isDriven) {}
-    virtual void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) = 0;
+    Tire(bool isDriven) : isDriven(isDriven) {}
+    void calculate(float load, Alpha<External> slip, float slipRatio = 0.f) {
+        calculateInternal(load, toInternal(slip), slipRatio);
+        force =
+            Force<External>(toExternal(internalForce.value), toExternal(internalForce.position));
+        torque = Torque<External>(toExternal(internalTorque));
+    }
 };

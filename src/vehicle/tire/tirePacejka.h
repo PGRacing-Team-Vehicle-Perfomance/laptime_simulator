@@ -1,11 +1,14 @@
 #pragma once
 
 #include "config/config.h"
+#include "coordTypes.h"
+#include "types.h"
 #include "vehicle/tire/tire.h"
 
 enum Side { Left, Right };
 
-class TirePacejka : public Tire<SAE> {
+class PacejkaModel {
+   protected:
     Side sideRelativeToVehicle;
 
     float PCY1;
@@ -28,8 +31,22 @@ class TirePacejka : public Tire<SAE> {
     float PVY4;
     float FNOMIN;
 
+    float computeFy(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio);
+
    public:
-    TirePacejka() = default;
-    TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle);
-    void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) override;
+    PacejkaModel() = default;
+    PacejkaModel(const TireConfig& config, Side sideRelativeToVehicle);
+};
+
+template <typename External = ISO8855>
+class TirePacejka : public Tire<SAE, External>, private PacejkaModel {
+   public:
+    TirePacejka(const TireConfig& config, bool isDriven, Side side)
+        : Tire<SAE, External>(isDriven), PacejkaModel(config, side) {}
+
+    void calculateInternal(float load, Alpha<SAE> slip, float slipRatio) override {
+        float FySAE = computeFy(load, slip, slipRatio);
+        this->internalForce = Force<SAE>(Vec<SAE>(0, FySAE, 0), Vec<SAE>(0, 0, 0));
+        this->internalTorque = Torque<SAE>(0, 0, 0);
+    }
 };

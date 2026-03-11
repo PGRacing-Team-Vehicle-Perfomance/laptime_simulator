@@ -12,9 +12,8 @@
 
 inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
 
-TirePacejka::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle)
-    : Tire(config, isDriven),
-      sideRelativeToVehicle(sideRelativeToVehicle),
+PacejkaModel::PacejkaModel(const TireConfig& config, Side sideRelativeToVehicle)
+    : sideRelativeToVehicle(sideRelativeToVehicle),
       PCY1(config.PCY1),
       PDY1(config.PDY1),
       PDY2(config.PDY2),
@@ -35,7 +34,7 @@ TirePacejka::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelat
       PVY4(config.PVY4),
       FNOMIN(config.FNOMIN) {}
 
-void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
+float PacejkaModel::computeFy(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.rad : slipAngle.rad;
     float gamma = 0;
@@ -53,6 +52,5 @@ void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slip
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    torque = Torque<SAE>(0, 0, 0);
-    force = Force<SAE>(Vec<SAE>(0, FySAE, 0), Vec<SAE>(0, 0, 0));
+    return FySAE;
 }

@@ -133,6 +133,7 @@ struct Force : Positioned<Vec<Frame>, Frame> {
 template <typename Frame = ISO8855>
 struct Torque : Vec<Frame> {
     Torque() = default;
+    Torque(Vec<Frame> vec) : Vec<Frame>(vec) {};
     Torque(float x, float y, float z) : Vec<Frame>(x, y, z) {};
 };
 
