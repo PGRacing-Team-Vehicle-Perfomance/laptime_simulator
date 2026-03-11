@@ -7,6 +7,8 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include "coordTypes.h"
+
 class Angle {
     float value;
 
@@ -26,12 +28,12 @@ class Angle {
     Angle operator-(float rhs) const { return Angle(value - rhs); }
 
     Angle& operator+=(float rhs) {
-        //value = normalize(value + rhs);
+        // value = normalize(value + rhs);
         value += rhs;
         return *this;
     }
     Angle& operator-=(float rhs) {
-        //value = normalize(value - rhs);
+        // value = normalize(value - rhs);
         value -= rhs;
         return *this;
     }
@@ -48,9 +50,9 @@ struct Vec3 {
 
 template <>
 struct Vec3<float> {
-    float x, y, z;
+    float x = 0, y = 0, z = 0;
 
-    Vec3() {};
+    Vec3() = default;
     Vec3(float x, float y, float z) : x(x), y(y), z(z) {};
     Vec3(float length, Angle phi, Angle theta) {
         float sinPhi = std::sin(phi.getRadians());
@@ -71,13 +73,11 @@ struct Vec3<float> {
         return Angle::fromRadians(std::acos(z / len));
     }
 
-    const Angle getTheta() const {
-        return Angle::fromRadians(std::atan2(y, x));
-    }
+    const Angle getTheta() const { return Angle::fromRadians(std::atan2(y, x)); }
 
     void setLength(float newLength) {
         float current = getLength();
-        
+
         if (current == 0.0f) {
             x = newLength;
             return;
@@ -104,11 +104,13 @@ struct Vec3<float> {
 
 using Vec3f = Vec3<float>;
 
-template <typename T>
+template <typename T, typename Frame = ISO8855>
 struct Positioned {
     T value;
-    Vec3f position;
+    Vec<Frame> position;
 
+    Positioned() = default;
+    Positioned(T value, Vec<Frame> position) : value(value), position(position) {}
     // Positioned<T> operator+(Positioned<T> rhs);
     // Positioned<T> operator-(Positioned<T> rhs);
 
@@ -116,27 +118,47 @@ struct Positioned {
     // Positioned<T>& operator-=(Positioned<T> rhs);
 };
 
-using Mass = Positioned<float>;
-using Force = Positioned<Vec3f>;
-using Torque = Vec3f;
+template <typename Frame = ISO8855>
+struct Mass : Positioned<float, Frame> {
+    Mass() = default;
+    Mass(float value, Vec<Frame> position) : Positioned<float, Frame>(value, position) {}
+};
 
+template <typename Frame = ISO8855>
+struct Force : Positioned<Vec<Frame>, Frame> {
+    Force() = default;
+    Force(Vec<Frame> value, Vec<Frame> position) : Positioned<Vec<Frame>, Frame>(value, position) {}
+};
+
+template <typename Frame = ISO8855>
+struct Torque : Vec<Frame> {
+    Torque() = default;
+    Torque(float x, float y, float z) : Vec<Frame>(x, y, z) {};
+};
+
+template <typename Frame = ISO8855>
 class MassiveObject {
    protected:
-    Mass mass;
+    Mass<Frame> mass;
+
    public:
-    Mass getMass() { return mass; }
+    Mass<Frame> getMass() { return mass; }
 };
 
+template <typename Frame = ISO8855>
 class ForcefullObject {
    protected:
-    Force force;
+    Force<Frame> force;
+
    public:
-    Force getForce() { return force; }
+    Force<Frame> getForce() { return force; }
 };
 
+template <typename Frame = ISO8855>
 class TorquedObject {
    protected:
-    Torque torque;
+    Torque<Frame> torque;
+
    public:
-    Torque getTorque() { return torque; }
+    Torque<Frame> getTorque() { return torque; }
 };

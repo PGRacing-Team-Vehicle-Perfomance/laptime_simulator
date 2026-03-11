@@ -3,11 +3,11 @@
 #include "config/config.h"
 #include "vehicle/tire/tire.h"
 
-enum Side {Left, Right};
+enum Side { Left, Right };
 
-class TirePacejka : public Tire {
+class TirePacejka : public Tire<SAE> {
     Side sideRelativeToVehicle;
-    
+
     float PCY1;
     float PDY1;
     float PDY2;
@@ -31,5 +31,5 @@ class TirePacejka : public Tire {
    public:
     TirePacejka() = default;
     TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle);
-    void calculate(float verticalLoad, float slipAngle, float slipRatio) override;
+    void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) override;
 };
