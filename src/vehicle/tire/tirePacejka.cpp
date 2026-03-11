@@ -54,11 +54,3 @@ float PacejkaModel::computeFy(float verticalLoad, Alpha<SAE> slipAngle, float sl
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
     return FySAE;
 }
-
-float PacejkaModel::computeFx(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
-    return 0;
-}
-
-float PacejkaModel::computeMz(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
-    return 0;
-}

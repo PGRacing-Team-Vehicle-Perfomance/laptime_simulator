@@ -32,8 +32,6 @@ class PacejkaModel {
     float FNOMIN;
 
     float computeFy(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio);
-    float computeFx(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio);
-    float computeMz(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio);
 
    public:
     PacejkaModel() = default;
@@ -48,9 +46,7 @@ class TirePacejka : public Tire<SAE, External>, private PacejkaModel {
 
     void calculateInternal(float load, Alpha<SAE> slip, float slipRatio) override {
         float FySAE = computeFy(load, slip, slipRatio);
-        float FxSAE = computeFx(load, slip, slipRatio);
-        float MzSAE = computeMz(load, slip, slipRatio);
-        this->internalForce = Force<SAE>(Vec<SAE>(FxSAE, FySAE, 0), Vec<SAE>(0, 0, 0));
-        this->internalTorque = Torque<SAE>(0, 0, MzSAE);
+        this->internalForce = Force<SAE>(Vec<SAE>(0, FySAE, 0), Vec<SAE>(0, 0, 0));
+        this->internalTorque = Torque<SAE>(0, 0, 0);
     }
 };
