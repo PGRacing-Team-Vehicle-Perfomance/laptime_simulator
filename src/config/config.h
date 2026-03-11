@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/configHelper.cpp"
+#include "coordTypes.h"
 #include "types.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -48,7 +49,7 @@ struct VehicleConfig {
     float cla = 3.7;
 
     // {0 0} geometric center of front axel
-    Position<ISO8855> claPosition = {0.75, 0.0, 0.0};  // change to % maby
+    Vec<ISO8855> claPosition = Vec<ISO8855>(0.75, 0.0, 0.0);  // change to % maby
 };
 
 // TODO: split into different configs for simple and pacejka and create implementation based on

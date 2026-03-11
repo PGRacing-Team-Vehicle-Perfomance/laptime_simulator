@@ -6,9 +6,8 @@
 
 #include "types.h"
 
-
 namespace CarConstants {
-    static constexpr unsigned int WHEEL_COUNT = 4;
+static constexpr unsigned int WHEEL_COUNT = 4;
 }
 
 template <typename T>
@@ -54,7 +53,7 @@ struct RotationalState {
 
 struct LinearState {
     Vec<ISO8855> velocity;
-    Position<ISO8855> position;
+    Vec<ISO8855> position;
 };
 
 struct VehicleState : LinearState, RotationalState {

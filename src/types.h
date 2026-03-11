@@ -107,7 +107,7 @@ using Vec3f = Vec3<float>;
 template <typename T, typename Frame = ISO8855>
 struct Positioned {
     T value;
-    Position<Frame> position;
+    Vec<Frame> position;
 
     // Positioned<T> operator+(Positioned<T> rhs);
     // Positioned<T> operator-(Positioned<T> rhs);
@@ -117,8 +117,12 @@ struct Positioned {
 };
 
 using Mass = Positioned<float>;
-using Force = Positioned<Vec<ISO8855>>;
-using Torque = Vec<ISO8855>;
+
+template <typename Frame = ISO8855>
+struct Force : Positioned<Vec<Frame>> {};
+
+template <typename Frame = ISO8855>
+struct Torque : Vec<Frame> {};
 
 class MassiveObject {
    protected:

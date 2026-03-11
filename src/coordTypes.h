@@ -59,6 +59,7 @@ struct Vec {
 
     Vec() = default;
     Vec(X<Frame> x, Y<Frame> y, Z<Frame> z) : x(x), y(y), z(z) {}
+    Vec(float x, float y, float z) : x(x), y(y), z(z) {}
 
     float getLength() const { return std::sqrt(x.v * x.v + y.v * y.v + z.v * z.v); }
 
@@ -73,13 +74,6 @@ struct Vec {
         y.v *= scale;
         z.v *= scale;
     }
-};
-
-template <typename Frame>
-struct Position {
-    float x = 0, y = 0, z = 0;
-    Position() = default;
-    Position(float x, float y, float z) : x(x), y(y), z(z) {}
 };
 
 enum class Axis { X, Y, Z };
@@ -108,12 +102,7 @@ struct Transform {
     Alpha<To> operator()(Alpha<From> a) const { return Alpha<To>{rotation.alpha(a.rad)}; }
     Gamma<To> operator()(Gamma<From> g) const { return Gamma<To>{rotation.gamma(g.rad)}; }
     Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.rad)}; }
-    Vec<To> operator()(Vec<From> v) const {
-        return {(*this)(v.x), (*this)(v.y), (*this)(v.z)};
-    }
-    Position<To> operator()(Position<From> p) const {
-        return {rotation.x(p.x), rotation.y(p.y), rotation.z(p.z)};
-    }
+    Vec<To> operator()(Vec<From> v) const { return {(*this)(v.x), (*this)(v.y), (*this)(v.z)}; }
 };
 
 constexpr Transform<ISO8855, SAE> isoToSae{FLIP_YZ};
