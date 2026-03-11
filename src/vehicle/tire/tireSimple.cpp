@@ -3,6 +3,8 @@
 #include <cmath>
 
 #include "config/config.h"
+#include "coordTypes.h"
+#include "types.h"
 
 TireSimple::TireSimple(const TireConfig& config, bool isDriven)
     : Tire(config, isDriven),
@@ -18,8 +20,7 @@ float TireSimple::calculateForce(float verticalLoad, bool isLateral) {
 }
 
 void TireSimple::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
-    force = {};
-    torque = {};
     float Fy = calculateForce(verticalLoad, true);
-    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{Fy}, .Mz = Z<SAE>{0}};
+    torque = Torque<>(0, 0, 0);
+    force = Force<>(Vec<>(0, Fy, 0), Vec<>(0, 0, 0));
 }

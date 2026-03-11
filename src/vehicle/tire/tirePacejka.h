@@ -3,11 +3,11 @@
 #include "config/config.h"
 #include "vehicle/tire/tire.h"
 
-enum Side {Left, Right};
+enum Side { Left, Right };
 
-class TirePacejka : public Tire {
+class TirePacejka : public Tire<SAE> {
     Side sideRelativeToVehicle;
-    
+
     float PCY1;
     float PDY1;
     float PDY2;

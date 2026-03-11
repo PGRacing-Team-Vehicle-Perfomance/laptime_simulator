@@ -11,9 +11,10 @@ struct TireCallResult {
 };
 
 template <typename From, typename To>
-TireCallResult<From> callTire(const FrameBridge<From, To>& bridge, Tire& tire, float load,
+TireCallResult<From> callTire(const FrameBridge<From, To>& bridge, Tire<To>& tire, float load,
                               Alpha<From> slip, float slipRatio = 0.f) {
     tire.calculate(load, bridge.toTarget(slip), slipRatio);
-    auto o = tire.getOutput();
-    return {bridge.fromTarget(o.Fx), bridge.fromTarget(o.Fy), bridge.fromTarget(o.Mz)};
+    auto f = tire.getForce().value;
+    auto t = tire.getTorque();
+    return {bridge.fromTarget(f.x), bridge.fromTarget(f.y), bridge.fromTarget(t.z)};
 }

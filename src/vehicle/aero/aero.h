@@ -3,7 +3,7 @@
 #include "config/config.h"
 #include "vehicle/vehicleHelper.h"
 
-class Aero: public ForcefullObject, public MassiveObject {
+class Aero : public ForcefullObject<>, public MassiveObject<> {
     float cla;
     void calculateTorques(VehicleState state, float airDensity, Vec<ISO8855> wind);
 
@@ -20,6 +20,5 @@ class Aero: public ForcefullObject, public MassiveObject {
    public:
     Aero(const VehicleConfig& config);
     Aero() = default;
-    void calculate(VehicleState state, float airDensity,
-                             Vec<ISO8855> wind = {});
+    void calculate(VehicleState state, float airDensity, Vec<ISO8855> wind = {});
 };

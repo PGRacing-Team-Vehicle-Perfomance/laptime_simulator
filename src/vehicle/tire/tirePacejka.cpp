@@ -7,6 +7,8 @@
 #include <unordered_map>
 
 #include "config/config.h"
+#include "coordTypes.h"
+#include "types.h"
 
 inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
 
@@ -34,9 +36,6 @@ TirePacejka::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelat
       FNOMIN(config.FNOMIN) {}
 
 void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
-    force = {};
-    torque = {};
-
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.rad : slipAngle.rad;
     float gamma = 0;
@@ -47,11 +46,13 @@ void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slip
     float ay = alpha + Sh;
     float Cy = PCY1;
     float Dy = Fz * (PDY1 + PDY2 * dfz) * (1.0 - PDY3 * gamma * gamma);
-    float Ky = FNOMIN * PKY1 * sin(2.0 * atan(Fz / (PKY2 * FNOMIN))) * (1.0 - PKY3 * std::fabs(gamma));
+    float Ky =
+        FNOMIN * PKY1 * sin(2.0 * atan(Fz / (PKY2 * FNOMIN))) * (1.0 - PKY3 * std::fabs(gamma));
     float By = Ky / (Cy * Dy);
     float Ey = (PEY1 + PEY2 * dfz) * (1.0 - (PEY3 + PEY4 * gamma) * sgn(ay));
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    output = TireOutput{.Fx = X<SAE>{0}, .Fy = Y<SAE>{FySAE}, .Mz = Z<SAE>{0}};
+    torque = Torque<SAE>(0, 0, 0);
+    force = Force<SAE>(Vec<SAE>(0, FySAE, 0), Vec<SAE>(0, 0, 0));
 }

@@ -51,7 +51,7 @@ struct Kappa {
     explicit Kappa(float r) : rad(r) {}
 };
 
-template <typename Frame>
+template <typename Frame = ISO8855>
 struct Vec {
     X<Frame> x;
     Y<Frame> y;

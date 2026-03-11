@@ -6,16 +6,16 @@
 #include <vector>
 
 #include "config/config.h"
-#include "vehicle/aero/aero.h"
 #include "coordTypes.h"
+#include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
 class Vehicle {
-    Mass combinedTotalMass;
+    Mass<> combinedTotalMass;
 
-    Mass combinedNonSuspendedMass;
-    Mass combinedSuspendedMass;
+    Mass<> combinedNonSuspendedMass;
+    Mass<> combinedSuspendedMass;
 
     WheelData<float> nonSuspendedMassAtWheels;
     WheelData<float> suspendedMassAtWheels;
@@ -37,9 +37,9 @@ class Vehicle {
 
     Positioned<Aero> aero;
 
-    WheelData<Positioned<std::unique_ptr<Tire>>> tires; 
-    
-    std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations, 
+    WheelData<Positioned<std::unique_ptr<Tire<SAE>>>> tires;
+
+    std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const EnvironmentConfig& environmentConfig);
     WheelData<Alpha<ISO8855>> calculateSlipAngles(Alpha<ISO8855> yawRate, Vec<ISO8855> velocity);
     WheelData<float> calculateSteeringAngles();
@@ -54,11 +54,14 @@ class Vehicle {
                                                      const WheelData<Y<ISO8855>>& tireFy);
     WheelData<X<ISO8855>> getVehicleFxFromTireForces(const WheelData<X<ISO8855>>& tireFx,
                                                      const WheelData<Y<ISO8855>>& tireFy);
-    VehicleState springing(WheelData<float> loads);   
+    VehicleState springing(WheelData<float> loads);
+
    public:
     VehicleState* getState();
     Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
     std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
-        const EnvironmentConfig& environmentConfig, float maxSteeringAngle = 10, float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1, float tolerance = 0.01, int maxIterations = 100);
+        const EnvironmentConfig& environmentConfig, float maxSteeringAngle = 10,
+        float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1,
+        float tolerance = 0.01, int maxIterations = 100);
 };
