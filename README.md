@@ -41,6 +41,10 @@ cmake --build .
 ./laptime_simulator
 ```
 
+## Architecture
+
+![Skid Pad Diagram](docs/skid_pad_diagram.svg)
+
 ## Configuration
 
 Vehicle parameters, tire models, and environment conditions can be configured in `src/config/config.h`:
