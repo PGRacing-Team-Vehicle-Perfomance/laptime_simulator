@@ -40,7 +40,7 @@ class Vehicle {
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const EnvironmentConfig& environmentConfig);
-    WheelData<Alpha<>> calculateSlipAngles(Alpha<> yawRate, Vec<> velocity);
+    WheelData<Alpha<>> calculateSlipAngles();
     WheelData<Alpha<>> calculateSteeringAngles();
     WheelData<float> staticLoad(float earthAcc);
     Y<> calculateLatAcc(const WheelData<X<>>& tireForcesX,
