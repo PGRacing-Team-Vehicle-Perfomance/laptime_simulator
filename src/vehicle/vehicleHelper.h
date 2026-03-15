@@ -48,6 +48,7 @@ struct WheelData {
 
 struct VehicleState {
     Alpha<> steeringAngle;
+    WheelData<Alpha<>> wheelAngles;
     Vec<> velocity;
 
     Vec<> angularVelocity;
