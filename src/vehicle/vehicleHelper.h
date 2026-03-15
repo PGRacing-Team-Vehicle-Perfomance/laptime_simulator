@@ -46,19 +46,12 @@ struct WheelData {
     }
 };
 
-struct RotationalState {
-    Vec<ISO8855> angular_velocity;
+struct VehicleState {
+    Alpha<> steeringAngle;
+    Vec<> velocity;
+
+    Vec<> angularVelocity;
     struct {
         Alpha<> z = Alpha<>(0);
     } rotation;
-};
-
-struct LinearState {
-    Vec<ISO8855> velocity;
-    Vec<ISO8855> position;
-};
-
-struct VehicleState : LinearState, RotationalState {
-    float deltaHeave = 0;
-    float steeringAngle = 0;
 };

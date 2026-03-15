@@ -11,20 +11,19 @@ struct SAE {};
 
 using Default = ISO8855;
 
-// Tag types for type safety (empty structs to distinguish X, Y, Z)
-struct XTag {};
-struct YTag {};
-struct ZTag {};
-struct AlphaTag{};
-struct GammaTag{};
-struct KappaTag{};
-
 template <typename Frame, typename Tag>
 struct CoordBase {
     float v = 0;
     CoordBase() = default;
     explicit CoordBase(float val) : v(val) {}
 };
+
+struct XTag {};
+struct YTag {};
+struct ZTag {};
+struct AlphaTag{};
+struct GammaTag{};
+struct KappaTag{};
 
 template <typename Frame = Default>
 using X = CoordBase<Frame, XTag>;
