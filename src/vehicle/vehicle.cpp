@@ -92,8 +92,9 @@ Vehicle::Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfi
 }
 
 std::vector<std::array<float, 4>> Vehicle::getYawMomentDiagramPoints(
-    float speed, const EnvironmentConfig& environmentConfig, float maxSteeringAngle, float steeringAngleStep,
-    float maxSlipAngle, float slipAngleStep, float tolerance, int maxIterations) {
+    float speed, const EnvironmentConfig& environmentConfig, float maxSteeringAngle,
+    float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance,
+    int maxIterations) {
     std::vector<std::array<float, 4>> out;
     for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
          steeringAngle += steeringAngleStep) {
@@ -182,25 +183,25 @@ WheelData<Alpha<>> Vehicle::calculateSlipAngles() {
 
     WheelData<Alpha<>> slipAngle;
 
-    slipAngle.FL =
-        Alpha<>{static_cast<float>(std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
-                                             (state.velocity.x.v - state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
-                                   state.wheelAngles.FL.v - toeAngle.FL.v)};
+    slipAngle.FL = Alpha<>{static_cast<float>(
+        std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
+                  (state.velocity.x.v - state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
+        state.wheelAngles.FL.v - toeAngle.FL.v)};
 
-    slipAngle.FR =
-        Alpha<>{static_cast<float>(std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
-                                             (state.velocity.x.v + state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
-                                   state.wheelAngles.FR.v - toeAngle.FR.v)};
+    slipAngle.FR = Alpha<>{static_cast<float>(
+        std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
+                  (state.velocity.x.v + state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
+        state.wheelAngles.FR.v - toeAngle.FR.v)};
 
-    slipAngle.RL =
-        Alpha<>{static_cast<float>(std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
-                                             (state.velocity.x.v - state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
-                                   state.wheelAngles.RL.v - toeAngle.RL.v)};
+    slipAngle.RL = Alpha<>{static_cast<float>(
+        std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
+                  (state.velocity.x.v - state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
+        state.wheelAngles.RL.v - toeAngle.RL.v)};
 
-    slipAngle.RR =
-        Alpha<>{static_cast<float>(std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
-                                             (state.velocity.x.v + state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
-                                   state.wheelAngles.RR.v - toeAngle.RR.v)};
+    slipAngle.RR = Alpha<>{static_cast<float>(
+        std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
+                  (state.velocity.x.v + state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
+        state.wheelAngles.RR.v - toeAngle.RR.v)};
 
     return slipAngle;
 }
