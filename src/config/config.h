@@ -38,7 +38,7 @@ struct VehicleConfig {
     float trackDistance = 1.53;
 
     // Toe angles [deg] - positive = toe-in, negative = toe-out
-    WheelData<float> toeAngle = {.FL = 0, .FR = 0, .RL = 0, .RR = 0};
+    WheelData<Alpha<ISO8855>> toeAngle = {.FL = Alpha<ISO8855>(0), .FR = Alpha<ISO8855>(0), .RL = Alpha<ISO8855>(0), .RR = Alpha<ISO8855>(0)};
 
     // TODO: Ackermann - implement as one of:
     //   - Ackermann %: 0=parallel, 100=ideal (cot(δ_o)-cot(δ_i)=t/L)

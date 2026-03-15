@@ -48,7 +48,9 @@ struct WheelData {
 
 struct RotationalState {
     Vec<ISO8855> angular_velocity;
-    Vec3<Angle> rotation = {0, 0, 0};
+    struct {
+        Alpha<> z = Alpha<>(0);
+    } rotation;
 };
 
 struct LinearState {

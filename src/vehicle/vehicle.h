@@ -30,7 +30,7 @@ class Vehicle {
     float rearTrackWidth;
     float trackDistance;
 
-    WheelData<float> toeAngle;
+    WheelData<Alpha<>> toeAngle;
     float ackermannPercentage;
 
     VehicleState state;
@@ -41,19 +41,19 @@ class Vehicle {
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const EnvironmentConfig& environmentConfig);
-    WheelData<Alpha<ISO8855>> calculateSlipAngles(Alpha<ISO8855> yawRate, Vec<ISO8855> velocity);
-    WheelData<float> calculateSteeringAngles();
+    WheelData<Alpha<>> calculateSlipAngles(Alpha<> yawRate, Vec<> velocity);
+    WheelData<Alpha<>> calculateSteeringAngles();
     WheelData<float> staticLoad(float earthAcc);
-    Y<ISO8855> calculateLatAcc(const WheelData<X<ISO8855>>& tireForcesX,
-                               const WheelData<Y<ISO8855>>& tireForcesY);
+    Y<> calculateLatAcc(const WheelData<X<>>& tireForcesX,
+                               const WheelData<Y<>>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    WheelData<float> totalTireLoads(Y<ISO8855> latAcc, const EnvironmentConfig& environmentConfig);
+    WheelData<float> totalTireLoads(Y<> latAcc, const EnvironmentConfig& environmentConfig);
     WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
-    WheelData<float> loadTransfer(Y<ISO8855> latAcc);
-    WheelData<Y<ISO8855>> getVehicleFyFromTireForces(const WheelData<X<ISO8855>>& tireFx,
-                                                     const WheelData<Y<ISO8855>>& tireFy);
-    WheelData<X<ISO8855>> getVehicleFxFromTireForces(const WheelData<X<ISO8855>>& tireFx,
-                                                     const WheelData<Y<ISO8855>>& tireFy);
+    WheelData<float> loadTransfer(Y<> latAcc);
+    WheelData<Y<>> getVehicleFyFromTireForces(const WheelData<X<>>& tireFx,
+                                                     const WheelData<Y<>>& tireFy);
+    WheelData<X<>> getVehicleFxFromTireForces(const WheelData<X<>>& tireFx,
+                                                     const WheelData<Y<>>& tireFy);
     VehicleState springing(WheelData<float> loads);
 
    public:
