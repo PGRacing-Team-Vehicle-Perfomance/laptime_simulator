@@ -37,7 +37,7 @@ TirePacejka::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelat
 
 void TirePacejka::calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) {
     float Fz = -verticalLoad;
-    float alpha = sideRelativeToVehicle == Left ? -slipAngle.rad : slipAngle.rad;
+    float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
     float gamma = 0;
 
     float dfz = (Fz - FNOMIN) / FNOMIN;
