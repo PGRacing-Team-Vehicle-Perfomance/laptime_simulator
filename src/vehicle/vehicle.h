@@ -31,8 +31,7 @@ class Vehicle {
     float trackDistance;
 
     WheelData<Alpha<>> toeAngle;
-    float ackermannPercentage;
-
+    
     VehicleState state;
 
     Positioned<Aero> aero;

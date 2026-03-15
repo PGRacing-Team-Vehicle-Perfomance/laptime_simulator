@@ -37,15 +37,6 @@ struct Torque : Vec<Frame> {
 };
 
 template <typename Frame = ISO8855>
-class MassiveObject {
-   protected:
-    Mass<Frame> mass;
-
-   public:
-    Mass<Frame> getMass() { return mass; }
-};
-
-template <typename Frame = ISO8855>
 class ForcefullObject {
    protected:
     Force<Frame> force;
