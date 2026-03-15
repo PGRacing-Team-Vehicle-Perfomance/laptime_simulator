@@ -10,9 +10,8 @@ int main() {
     EnvironmentConfig environmentConfig;
     
     Vehicle v(vehicleConfig, tireConfig);
-    v.getState()->velocity.setLength(11);
     
-    auto points = v.getYawMomentDiagramPoints(environmentConfig, 20, 2, 20, 1);
+    auto points = v.getYawMomentDiagramPoints(11, environmentConfig, 20, 2, 20, 1);
     FILE *f = fopen("build/yaw_diagram.csv", "w");
     if (f) {
         fprintf(f, "steering,slip,latAcc,yawMoment\n");

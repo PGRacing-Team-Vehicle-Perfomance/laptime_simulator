@@ -9,49 +9,43 @@
 struct ISO8855 {};
 struct SAE {};
 
-template <typename Frame>
-struct X {
+using Default = ISO8855;
+
+template <typename Frame, typename Tag>
+struct CoordBase {
     float v = 0;
-    X() = default;
-    explicit X(float val) : v(val) {}
+    CoordBase() = default;
+    explicit CoordBase(float val) : v(val) {}
 };
 
-template <typename Frame>
-struct Y {
-    float v = 0;
-    Y() = default;
-    explicit Y(float val) : v(val) {}
-};
+struct XTag {};
+struct YTag {};
+struct ZTag {};
+struct AlphaTag{};
+struct GammaTag{};
+struct KappaTag{};
 
-template <typename Frame>
-struct Z {
-    float v = 0;
-    Z() = default;
-    explicit Z(float val) : v(val) {}
-};
+template <typename Frame = Default>
+using X = CoordBase<Frame, XTag>;
 
-template <typename Frame>
-struct Alpha {
-    float rad = 0;
-    Alpha() = default;
-    explicit Alpha(float r) : rad(r) {}
-};
+template <typename Frame = Default>
+using Y = CoordBase<Frame, YTag>;
 
-template <typename Frame>
-struct Gamma {
-    float rad = 0;
-    Gamma() = default;
-    explicit Gamma(float r) : rad(r) {}
-};
+template <typename Frame = Default>
+using Z = CoordBase<Frame, ZTag>;
 
-template <typename Frame>
-struct Kappa {
-    float rad = 0;
-    Kappa() = default;
-    explicit Kappa(float r) : rad(r) {}
-};
 
-template <typename Frame = ISO8855>
+template <typename Frame = Default>
+using Alpha = CoordBase<Frame, AlphaTag>;
+
+template <typename Frame = Default>
+using Gamma = CoordBase<Frame, GammaTag>;
+
+template <typename Frame = Default>
+using Kappa = CoordBase<Frame, KappaTag>;
+
+
+template <typename Frame = Default>
 struct Vec {
     X<Frame> x;
     Y<Frame> y;
@@ -99,9 +93,9 @@ struct Transform {
     X<To> operator()(X<From> v) const { return X<To>{rotation.x(v.v)}; }
     Y<To> operator()(Y<From> v) const { return Y<To>{rotation.y(v.v)}; }
     Z<To> operator()(Z<From> v) const { return Z<To>{rotation.z(v.v)}; }
-    Alpha<To> operator()(Alpha<From> a) const { return Alpha<To>{rotation.alpha(a.rad)}; }
-    Gamma<To> operator()(Gamma<From> g) const { return Gamma<To>{rotation.gamma(g.rad)}; }
-    Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.rad)}; }
+    Alpha<To> operator()(Alpha<From> a) const { return Alpha<To>{rotation.alpha(a.v)}; }
+    Gamma<To> operator()(Gamma<From> g) const { return Gamma<To>{rotation.gamma(g.v)}; }
+    Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.v)}; }
     Vec<To> operator()(Vec<From> v) const { return {(*this)(v.x), (*this)(v.y), (*this)(v.z)}; }
 };
 
