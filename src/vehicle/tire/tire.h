@@ -4,7 +4,7 @@
 #include "coordTypes.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename Frame = ISO8855>
+template <typename Frame>
 class Tire : public ForcefullObject<Frame>, public TorquedObject<Frame> {
    protected:
     bool isDriven;
@@ -12,5 +12,5 @@ class Tire : public ForcefullObject<Frame>, public TorquedObject<Frame> {
    public:
     Tire() = default;
     Tire(const TireConfig& config, bool isDriven) : isDriven(isDriven) {}
-    virtual void calculate(float verticalLoad, Alpha<SAE> slipAngle, float slipRatio) = 0;
+    virtual void calculate(float verticalLoad, Alpha<Frame> slipAngle, float slipRatio) = 0;
 };

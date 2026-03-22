@@ -11,11 +11,12 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
+template <typename VFrame, typename TFrame>
 class Vehicle {
-    Mass<> combinedTotalMass;
+    Mass<VFrame> combinedTotalMass;
 
-    Mass<> combinedNonSuspendedMass;
-    Mass<> combinedSuspendedMass;
+    Mass<VFrame> combinedNonSuspendedMass;
+    Mass<VFrame> combinedSuspendedMass;
 
     WheelData<float> nonSuspendedMassAtWheels;
     WheelData<float> suspendedMassAtWheels;
@@ -30,36 +31,38 @@ class Vehicle {
     float rearTrackWidth;
     float trackDistance;
 
-    WheelData<Alpha<>> toeAngle;
-    
-    VehicleState state;
+    WheelData<Alpha<VFrame>> toeAngle;
 
-    Positioned<Aero> aero;
+    VehicleState<VFrame> state;
 
-    WheelData<Positioned<std::unique_ptr<Tire<SAE>>>> tires;
+    Positioned<Aero<VFrame>, VFrame> aero;
+
+    WheelData<Positioned<std::unique_ptr<Tire<TFrame>>, VFrame>> tires;
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
-                                               const EnvironmentConfig& environmentConfig);
-    WheelData<Alpha<>> calculateSlipAngles();
-    void setSteering(Alpha<> steeringAngle);
+                                               const EnvironmentConfig<VFrame>& environmentConfig);
+    WheelData<Alpha<VFrame>> calculateSlipAngles();
+    void setSteering(Alpha<VFrame> steeringAngle);
     WheelData<float> staticLoad(float earthAcc);
-    Y<> calculateLatAcc(const WheelData<X<>>& tireForcesX,
-                               const WheelData<Y<>>& tireForcesY);
+    Y<VFrame> calculateLatAcc(const WheelData<X<VFrame>>& tireForcesX,
+                             const WheelData<Y<VFrame>>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    WheelData<float> totalTireLoads(Y<> latAcc, const EnvironmentConfig& environmentConfig);
-    WheelData<float> aeroLoad(const EnvironmentConfig& environmentConfig);
-    WheelData<float> loadTransfer(Y<> latAcc);
-    WheelData<Y<>> getVehicleFyFromTireForces(const WheelData<X<>>& tireFx,
-                                                     const WheelData<Y<>>& tireFy);
-    WheelData<X<>> getVehicleFxFromTireForces(const WheelData<X<>>& tireFx,
-                                                     const WheelData<Y<>>& tireFy);
-    VehicleState springing(WheelData<float> loads);
-
+    WheelData<float> totalTireLoads(Y<VFrame> latAcc,
+                                    const EnvironmentConfig<VFrame>& environmentConfig);
+    WheelData<float> aeroLoad(const EnvironmentConfig<VFrame>& environmentConfig);
+    WheelData<float> loadTransfer(Y<VFrame> latAcc);
+    WheelData<Y<VFrame>> getVehicleFyFromTireForces(const WheelData<X<VFrame>>& tireFx,
+                                                   const WheelData<Y<VFrame>>& tireFy);
+    WheelData<X<VFrame>> getVehicleFxFromTireForces(const WheelData<X<VFrame>>& tireFx,
+                                                   const WheelData<Y<VFrame>>& tireFy);
+    VehicleState<VFrame> springing(WheelData<float> loads);
    public:
-    Vehicle(const VehicleConfig& vehicleConfig, const TireConfig& tireConfig);
+    Vehicle(const VehicleConfig<VFrame>& vehicleConfig, const TireConfig& tireConfig);
     Vehicle() = default;
-    std::vector<std::array<float, 4>> getYawMomentDiagramPoints(float speed,
-        const EnvironmentConfig& environmentConfig, float maxSteeringAngle = 10,
+    std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
+        float speed, const EnvironmentConfig<VFrame>& environmentConfig, float maxSteeringAngle = 10,
         float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1,
         float tolerance = 0.01, int maxIterations = 100);
 };
+
+#include "vehicle.inl"
