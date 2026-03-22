@@ -12,9 +12,9 @@
 
 inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
 
-template <typename Frame>
-TirePacejka<Frame>::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle)
-    : Tire<Frame>(config, isDriven),
+template <typename Internal, typename External>
+TirePacejka<Internal, External>::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle)
+    : Tire<Internal, External>(config, isDriven),
       sideRelativeToVehicle(sideRelativeToVehicle),
       PCY1(config.PCY1),
       PDY1(config.PDY1),
@@ -36,8 +36,8 @@ TirePacejka<Frame>::TirePacejka(const TireConfig& config, bool isDriven, Side si
       PVY4(config.PVY4),
       FNOMIN(config.FNOMIN) {}
 
-template <typename Frame>
-void TirePacejka<Frame>::calculate(float verticalLoad, Alpha<Frame> slipAngle, float slipRatio) {
+template <typename Internal, typename External>
+void TirePacejka<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
     float gamma = 0;
@@ -55,6 +55,6 @@ void TirePacejka<Frame>::calculate(float verticalLoad, Alpha<Frame> slipAngle, f
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    this->torque = Torque<Frame>(0, 0, 0);
-    this->force = Force<Frame>(Vec<Frame>(0, FySAE, 0), Vec<Frame>(0, 0, 0));
+    this->internalTorque = Torque<Internal>(0, 0, 0);
+    this->internalForce = Force<Internal>(Vec<Internal>(0, FySAE, 0), Vec<Internal>(0, 0, 0));
 }

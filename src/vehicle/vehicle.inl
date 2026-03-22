@@ -11,7 +11,6 @@
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
-#include "vehicle/tire/tireBridge.h"
 #include "vehicle/tire/tirePacejka.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -28,10 +27,10 @@ Vehicle<VFrame, TFrame>::Vehicle(const VehicleConfig<VFrame>& vehicleConfig, con
     aero.value = {vehicleConfig};
     aero.position = vehicleConfig.claPosition;
 
-    tires.FL.value = std::make_unique<TirePacejka<TFrame>>(tireConfig, false, Left);
-    tires.FR.value = std::make_unique<TirePacejka<TFrame>>(tireConfig, false, Right);
-    tires.RL.value = std::make_unique<TirePacejka<TFrame>>(tireConfig, false, Left);
-    tires.RR.value = std::make_unique<TirePacejka<TFrame>>(tireConfig, false, Right);
+    tires.FL.value = std::make_unique<TirePacejka<TFrame, VFrame>>(tireConfig, false, Left);
+    tires.FR.value = std::make_unique<TirePacejka<TFrame, VFrame>>(tireConfig, false, Right);
+    tires.RL.value = std::make_unique<TirePacejka<TFrame, VFrame>>(tireConfig, false, Left);
+    tires.RR.value = std::make_unique<TirePacejka<TFrame, VFrame>>(tireConfig, false, Right);
 
 
     combinedNonSuspendedMass = {0, {0, 0, 0}};
@@ -137,11 +136,12 @@ std::array<float, 2> Vehicle<VFrame, TFrame>::getLatAccAndYawMoment(float tolera
         slipAngles = calculateSlipAngles();
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            auto out = callTire(FrameBridge<VFrame, TFrame>(), *tires[i].value, loads[i], slipAngles[i]);
-
-            tireForcesX[i] = out.Fx;
-            tireForcesY[i] = out.Fy;
-            tireMomentsZ[i] = out.Mz;
+            tires[i].value->calculate(loads[i], slipAngles[i], 0);
+            auto f = tires[i].value->getForce();
+            auto t = tires[i].value->getTorque();
+            tireForcesX[i] = f.value.x;
+            tireForcesY[i] = f.value.y;
+            tireMomentsZ[i] = t.z;
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);

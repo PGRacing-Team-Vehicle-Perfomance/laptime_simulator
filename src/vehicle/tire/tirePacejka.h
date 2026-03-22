@@ -5,8 +5,8 @@
 
 enum Side { Left, Right };
 
-template <typename Frame>
-class TirePacejka : public Tire<Frame> {
+template <typename Internal, typename External>
+class TirePacejka : public Tire<Internal, External> {
     Side sideRelativeToVehicle;
 
     float PCY1;
@@ -28,11 +28,10 @@ class TirePacejka : public Tire<Frame> {
     float PVY3;
     float PVY4;
     float FNOMIN;
-
+    void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) override;
    public:
     TirePacejka() = default;
     TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle);
-    void calculate(float verticalLoad, Alpha<Frame> slipAngle, float slipRatio) override;
 };
 
 #include "tirePacejka.inl"

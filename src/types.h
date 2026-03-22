@@ -9,47 +9,48 @@
 
 #include "coordTypes.h"
 
-template <typename T, typename VFrame>
+template <typename T, typename Frame>
 struct Positioned {
     T value;
-    Vec<VFrame> position;
+    Vec<Frame> position;
 
     Positioned() = default;
-    Positioned(T value, Vec<VFrame> position) : value(value), position(position) {}
+    Positioned(T value, Vec<Frame> position) : value(value), position(position) {}
 };
 
-template <typename VFrame>
-struct Mass : Positioned<float, VFrame> {
+template <typename Frame>
+struct Mass : Positioned<float, Frame> {
     Mass() = default;
-    Mass(float value, Vec<VFrame> position) : Positioned<float, VFrame>(value, position) {}
+    Mass(float value, Vec<Frame> position) : Positioned<float, Frame>(value, position) {}
 };
 
-template <typename VFrame>
-struct Force : Positioned<Vec<VFrame>, VFrame> {
+template <typename Frame>
+struct Force : Positioned<Vec<Frame>, Frame> {
     Force() = default;
-    Force(Vec<VFrame> value, Vec<VFrame> position) : Positioned<Vec<VFrame>, VFrame>(value, position) {}
+    Force(Vec<Frame> value, Vec<Frame> position) : Positioned<Vec<Frame>, Frame>(value, position) {}
 };
 
-template <typename VFrame>
-struct Torque : Vec<VFrame> {
+template <typename Frame>
+struct Torque : Vec<Frame> {
     Torque() = default;
-    Torque(float x, float y, float z) : Vec<VFrame>(x, y, z) {};
+    Torque(Vec<Frame> vec) : Vec<Frame>(vec) {};
+    Torque(float x, float y, float z) : Vec<Frame>(x, y, z) {};
 };
 
-template <typename VFrame>
+template <typename Frame>
 class ForcefullObject {
    protected:
-    Force<VFrame> force;
+    Force<Frame> force;
 
    public:
-    Force<VFrame> getForce() { return force; }
+    Force<Frame> getForce() { return force; }
 };
 
-template <typename VFrame>
+template <typename Frame>
 class TorquedObject {
    protected:
-    Torque<VFrame> torque;
+    Torque<Frame> torque;
 
    public:
-    Torque<VFrame> getTorque() { return torque; }
+    Torque<Frame> getTorque() { return torque; }
 };
