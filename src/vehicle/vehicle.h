@@ -37,7 +37,7 @@ class Vehicle {
 
     Positioned<Aero<VFrame>, VFrame> aero;
 
-    WheelData<Positioned<std::unique_ptr<Tire<TFrame>>, VFrame>> tires;
+    WheelData<Positioned<std::unique_ptr<Tire<TFrame, VFrame>>, VFrame>> tires;
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const EnvironmentConfig<VFrame>& environmentConfig);
