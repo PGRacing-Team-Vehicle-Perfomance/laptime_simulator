@@ -5,12 +5,15 @@
 #include "vehicle/vehicle.h"
 
 int main() {
+    using VehicleFrame = ISO8855;
+    using TireFrame = SAE;
+
     TireConfig tireConfig;
-    VehicleConfig vehicleConfig;
-    EnvironmentConfig environmentConfig;
+    VehicleConfig<VehicleFrame> vehicleConfig;
+    EnvironmentConfig<VehicleFrame> environmentConfig;
     
-    Vehicle v(vehicleConfig, tireConfig);
-    
+    Vehicle<VehicleFrame, TireFrame> v(vehicleConfig, tireConfig);
+
     auto points = v.getYawMomentDiagramPoints(11, environmentConfig, 20, 2, 20, 1);
     FILE *f = fopen("build/yaw_diagram.csv", "w");
     if (f) {

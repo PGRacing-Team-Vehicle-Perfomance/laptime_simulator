@@ -9,8 +9,6 @@
 struct ISO8855 {};
 struct SAE {};
 
-using Default = ISO8855;
-
 template <typename Frame, typename Tag>
 struct CoordBase {
     float v = 0;
@@ -25,27 +23,27 @@ struct AlphaTag{};
 struct GammaTag{};
 struct KappaTag{};
 
-template <typename Frame = Default>
+template <typename Frame>
 using X = CoordBase<Frame, XTag>;
 
-template <typename Frame = Default>
+template <typename Frame>
 using Y = CoordBase<Frame, YTag>;
 
-template <typename Frame = Default>
+template <typename Frame>
 using Z = CoordBase<Frame, ZTag>;
 
 
-template <typename Frame = Default>
+template <typename Frame>
 using Alpha = CoordBase<Frame, AlphaTag>;
 
-template <typename Frame = Default>
+template <typename Frame>
 using Gamma = CoordBase<Frame, GammaTag>;
 
-template <typename Frame = Default>
+template <typename Frame>
 using Kappa = CoordBase<Frame, KappaTag>;
 
 
-template <typename Frame = Default>
+template <typename Frame>
 struct Vec {
     X<Frame> x;
     Y<Frame> y;
@@ -107,5 +105,3 @@ struct FrameBridge {
     Transform<From, To> toTarget;
     Transform<To, From> fromTarget;
 };
-
-constexpr FrameBridge<ISO8855, SAE> isoSae{isoToSae, saeToIso};

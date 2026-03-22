@@ -46,14 +46,15 @@ struct WheelData {
     }
 };
 
+template <typename Frame>
 struct VehicleState {
-    Alpha<> steeringAngle;
-    WheelData<Alpha<>> wheelAngles;
+    Alpha<Frame> steeringAngle;
+    WheelData<Alpha<Frame>> wheelAngles;
     
-    Vec<> velocity;
+    Vec<Frame> velocity;
 
-    Vec<> angularVelocity;
+    Vec<Frame> angularVelocity;
     struct {
-        Alpha<> z = Alpha<>(0);
+        Alpha<Frame> z = Alpha<Frame>(0);
     } rotation;
 };

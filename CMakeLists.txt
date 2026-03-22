@@ -14,10 +14,6 @@ set(SOURCE_FILES )
 
 add_executable(${PROJECT_NAME} 
     src/main.cpp
-    src/vehicle/vehicle.cpp
-    src/vehicle/aero/aero.cpp
-    src/vehicle/tire/tireSimple.cpp
-    src/vehicle/tire/tirePacejka.cpp
 )
 
 target_include_directories(laptime_simulator PRIVATE src)

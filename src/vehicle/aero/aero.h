@@ -3,14 +3,17 @@
 #include "config/config.h"
 #include "vehicle/vehicleHelper.h"
 
-class Aero : public ForcefullObject<> {
+template <typename Frame>
+class Aero : public ForcefullObject<Frame> {
     float cla;
     
-    void calculateForces(VehicleState state, float airDensity, Vec<> wind);
-    void downforce(VehicleState state, float airDensity, Vec<> wind);
+    void calculateForces(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
+    void downforce(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
 
    public:
-    Aero(const VehicleConfig& config);
+    Aero(const VehicleConfig<Frame>& config);
     Aero() = default;
-    void calculate(VehicleState state, float airDensity, Vec<> wind = {});
+    void calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind = {});
 };
+
+#include "aero.inl"
