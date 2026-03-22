@@ -3,6 +3,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 #include "config/config.h"
@@ -11,7 +12,7 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename VFrame, typename TFrame>
+template <typename VFrame>
 class Vehicle {
     Mass<VFrame> combinedTotalMass;
 
@@ -37,7 +38,7 @@ class Vehicle {
 
     Positioned<Aero<VFrame>, VFrame> aero;
 
-    WheelData<Positioned<std::unique_ptr<Tire<TFrame, VFrame>>, VFrame>> tires;
+    WheelData<Positioned<std::unique_ptr<TireBase<VFrame>>, VFrame>> tires;
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const EnvironmentConfig<VFrame>& environmentConfig);
@@ -57,8 +58,12 @@ class Vehicle {
                                                    const WheelData<Y<VFrame>>& tireFy);
     VehicleState<VFrame> springing(WheelData<float> loads);
    public:
-    Vehicle(const VehicleConfig<VFrame>& vehicleConfig, const TireConfig& tireConfig);
+    Vehicle(const VehicleConfig<VFrame>& vehicleConfig, WheelData<Positioned<std::unique_ptr<TireBase<VFrame>>, VFrame>>&& tires);
     Vehicle() = default;
+
+    template <typename InternalTireFrame>
+    void makeTires(const TireConfig& tireConfig);
+
     std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
         float speed, const EnvironmentConfig<VFrame>& environmentConfig, float maxSteeringAngle = 10,
         float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1,

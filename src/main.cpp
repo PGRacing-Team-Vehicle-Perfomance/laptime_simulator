@@ -12,7 +12,14 @@ int main() {
     VehicleConfig<VehicleFrame> vehicleConfig;
     EnvironmentConfig<VehicleFrame> environmentConfig;
     
-    Vehicle<VehicleFrame, TireFrame> v(vehicleConfig, tireConfig);
+    // later will be part of vehicle builder
+    WheelData<Positioned<std::unique_ptr<TireBase<VehicleFrame>>, VehicleFrame>> tires;
+    tires.FL.value = std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Left);
+    tires.FR.value = std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Right);
+    tires.RL.value = std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Left);
+    tires.RR.value = std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Right);
+
+    Vehicle<VehicleFrame> v(vehicleConfig, std::move(tires));
 
     auto points = v.getYawMomentDiagramPoints(11, environmentConfig, 20, 2, 20, 1);
     FILE *f = fopen("build/yaw_diagram.csv", "w");
