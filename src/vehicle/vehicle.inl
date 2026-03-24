@@ -16,7 +16,7 @@
 
 template <typename Frame>
 Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
-                         WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires)
+                        WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires)
     : rollCenterHeightFront(vehicleConfig.rollCenterHeightFront),
       rollCenterHeightBack(vehicleConfig.rollCenterHeightBack),
       frontTrackWidth(vehicleConfig.frontTrackWidth),
@@ -88,35 +88,7 @@ Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
 }
 
 template <typename Frame>
-std::vector<std::array<float, 4>> Vehicle<Frame>::getYawMomentDiagramPoints(
-    float speed, const EnvironmentConfig<Frame>& environmentConfig, float maxSteeringAngle,
-    float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance,
-    int maxIterations) {
-    std::vector<std::array<float, 4>> out;
-    for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
-         steeringAngle += steeringAngleStep) {
-        setSteering(Alpha<Frame>(steeringAngle * M_PI / 180.f));
-        for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle;
-             chassisSlipAngle += slipAngleStep) {
-            state.rotation.z = Alpha<Frame>(chassisSlipAngle * M_PI / 180.f);
-
-            state.velocity.x = X<Frame>{speed * std::cos(state.rotation.z.v)};
-            state.velocity.y = Y<Frame>{speed * std::sin(state.rotation.z.v)};
-            state.velocity.z = Z<Frame>{0};
-
-            state.angularVelocity.setLength(0);
-
-            std::array<float, 2> diagramPoint =
-                getLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
-            out.push_back(
-                {state.steeringAngle.v, state.rotation.z.v, diagramPoint[0], diagramPoint[1]});
-        }
-    }
-    return out;
-}
-
-template <typename Frame>
-std::array<float, 2> Vehicle<Frame>::getLatAccAndYawMoment(
+std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float tolerance, int maxIterations, const EnvironmentConfig<Frame>& environmentConfig) {
     WheelData<X<Frame>> tireForcesX;
     WheelData<Y<Frame>> tireForcesY;
@@ -125,6 +97,8 @@ std::array<float, 2> Vehicle<Frame>::getLatAccAndYawMoment(
     Y<Frame> latAcc{0};
     float error;
     int iterations = 0;
+
+    state.angularVelocity.setLength(0);
 
     auto loads = staticLoad(environmentConfig.earthAcc);
     do {
@@ -168,12 +142,25 @@ std::array<float, 2> Vehicle<Frame>::getLatAccAndYawMoment(
 }
 
 template <typename Frame>
-void Vehicle<Frame>::setSteering(Alpha<Frame> steeringAngle) {
+void Vehicle<Frame>::setSteeringAngle(Alpha<Frame> steeringAngle) {
     state.steeringAngle = steeringAngle;
     state.wheelAngles.FL = Alpha<Frame>(state.steeringAngle);
     state.wheelAngles.FR = Alpha<Frame>(state.steeringAngle);
     state.wheelAngles.RL = Alpha<Frame>(0);
     state.wheelAngles.RR = Alpha<Frame>(0);
+}
+
+template <typename Frame>
+void Vehicle<Frame>::setChassisSlipAngle(Alpha<Frame> chassisSlipAngle) {
+    float speed = state.velocity.getLength();
+    state.velocity.x = X<Frame>{speed * std::cos(chassisSlipAngle.v)};
+    state.velocity.y = Y<Frame>{speed * std::sin(chassisSlipAngle.v)};
+    state.velocity.z = Z<Frame>(0);
+}
+
+template <typename Frame>
+void Vehicle<Frame>::setSpeed(float speed) {
+    state.velocity.setLength(speed);
 }
 
 template <typename Frame>
@@ -208,7 +195,7 @@ WheelData<Alpha<Frame>> Vehicle<Frame>::calculateSlipAngles() {
 
 template <typename Frame>
 Y<Frame> Vehicle<Frame>::calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
-                                           const WheelData<Y<Frame>>& tireForcesY) {
+                                         const WheelData<Y<Frame>>& tireForcesY) {
     auto vehicleFy = getVehicleFyFromTireForces(tireForcesX, tireForcesY);
     float latForce = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
@@ -218,8 +205,8 @@ Y<Frame> Vehicle<Frame>::calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
 }
 
 template <typename Frame>
-WheelData<Y<Frame>> Vehicle<Frame>::getVehicleFyFromTireForces(
-    const WheelData<X<Frame>>& tireFx, const WheelData<Y<Frame>>& tireFy) {
+WheelData<Y<Frame>> Vehicle<Frame>::getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                               const WheelData<Y<Frame>>& tireFy) {
     WheelData<Y<Frame>> vehicleFy;
 
     float deltaFL = state.wheelAngles.FL.v;
@@ -234,8 +221,8 @@ WheelData<Y<Frame>> Vehicle<Frame>::getVehicleFyFromTireForces(
 }
 
 template <typename Frame>
-WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(
-    const WheelData<X<Frame>>& tireFx, const WheelData<Y<Frame>>& tireFy) {
+WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                               const WheelData<Y<Frame>>& tireFy) {
     WheelData<X<Frame>> vehicleFx;
 
     float deltaFL = state.wheelAngles.FL.v;
@@ -250,8 +237,8 @@ WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(
 }
 
 template <typename Frame>
-WheelData<float> Vehicle<Frame>::totalTireLoads(
-    Y<Frame> latAcc, const EnvironmentConfig<Frame>& environmentConfig) {
+WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc,
+                                                const EnvironmentConfig<Frame>& environmentConfig) {
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig);
     auto transfer = loadTransfer(latAcc);
@@ -273,7 +260,7 @@ WheelData<float> Vehicle<Frame>::staticLoad(float earthAcc) {
 
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::distributeForces(float totalForce, float frontDist,
-                                                   float leftDist) {
+                                                  float leftDist) {
     WheelData<float> forces;
     forces.FL = totalForce * (trackDistance - frontDist) / trackDistance *
                 (frontTrackWidth / 2 + leftDist) / frontTrackWidth;
