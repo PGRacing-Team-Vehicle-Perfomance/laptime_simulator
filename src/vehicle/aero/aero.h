@@ -7,7 +7,6 @@ template <typename Frame>
 class Aero : public ForcefullObject<Frame> {
     float cla;
     
-    void calculateForces(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
     void downforce(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
 
    public:

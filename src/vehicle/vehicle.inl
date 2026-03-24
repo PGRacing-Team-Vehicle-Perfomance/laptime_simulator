@@ -14,9 +14,9 @@
 #include "vehicle/tire/tirePacejka.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename VFrame>
-Vehicle<VFrame>::Vehicle(const VehicleConfig<VFrame>& vehicleConfig,
-                         WheelData<Positioned<std::unique_ptr<TireBase<VFrame>>, VFrame>>&& tires)
+template <typename Frame>
+Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
+                         WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires)
     : rollCenterHeightFront(vehicleConfig.rollCenterHeightFront),
       rollCenterHeightBack(vehicleConfig.rollCenterHeightBack),
       frontTrackWidth(vehicleConfig.frontTrackWidth),
@@ -87,37 +87,24 @@ Vehicle<VFrame>::Vehicle(const VehicleConfig<VFrame>& vehicleConfig,
     antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
 }
 
-template <typename VFrame>
-template <typename InternalTireFrame>
-void Vehicle<VFrame>::makeTires(const TireConfig& tireConfig) {
-    tires.FL.value =
-        std::make_unique<TirePacejka<InternalTireFrame, VFrame>>(tireConfig, false, Left);
-    tires.FR.value =
-        std::make_unique<TirePacejka<InternalTireFrame, VFrame>>(tireConfig, false, Right);
-    tires.RL.value =
-        std::make_unique<TirePacejka<InternalTireFrame, VFrame>>(tireConfig, false, Left);
-    tires.RR.value =
-        std::make_unique<TirePacejka<InternalTireFrame, VFrame>>(tireConfig, false, Right);
-}
-
-template <typename VFrame>
-std::vector<std::array<float, 4>> Vehicle<VFrame>::getYawMomentDiagramPoints(
-    float speed, const EnvironmentConfig<VFrame>& environmentConfig, float maxSteeringAngle,
+template <typename Frame>
+std::vector<std::array<float, 4>> Vehicle<Frame>::getYawMomentDiagramPoints(
+    float speed, const EnvironmentConfig<Frame>& environmentConfig, float maxSteeringAngle,
     float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance,
     int maxIterations) {
     std::vector<std::array<float, 4>> out;
     for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
          steeringAngle += steeringAngleStep) {
-        setSteering(Alpha<VFrame>(steeringAngle * M_PI / 180.f));
+        setSteering(Alpha<Frame>(steeringAngle * M_PI / 180.f));
         for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle;
              chassisSlipAngle += slipAngleStep) {
-            state.rotation.z = Alpha<VFrame>(chassisSlipAngle * M_PI / 180.f);
+            state.rotation.z = Alpha<Frame>(chassisSlipAngle * M_PI / 180.f);
 
-            state.velocity.x = X<VFrame>{speed * std::cos(state.rotation.z.v)};
-            state.velocity.y = Y<VFrame>{speed * std::sin(state.rotation.z.v)};
-            state.velocity.z = Z<VFrame>{0};
+            state.velocity.x = X<Frame>{speed * std::cos(state.rotation.z.v)};
+            state.velocity.y = Y<Frame>{speed * std::sin(state.rotation.z.v)};
+            state.velocity.z = Z<Frame>{0};
 
-            state.angularVelocity = {};
+            state.angularVelocity.setLength(0);
 
             std::array<float, 2> diagramPoint =
                 getLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
@@ -128,14 +115,14 @@ std::vector<std::array<float, 4>> Vehicle<VFrame>::getYawMomentDiagramPoints(
     return out;
 }
 
-template <typename VFrame>
-std::array<float, 2> Vehicle<VFrame>::getLatAccAndYawMoment(
-    float tolerance, int maxIterations, const EnvironmentConfig<VFrame>& environmentConfig) {
-    WheelData<X<VFrame>> tireForcesX;
-    WheelData<Y<VFrame>> tireForcesY;
-    WheelData<Z<VFrame>> tireMomentsZ;
-    WheelData<Alpha<VFrame>> slipAngles;
-    Y<VFrame> latAcc{0};
+template <typename Frame>
+std::array<float, 2> Vehicle<Frame>::getLatAccAndYawMoment(
+    float tolerance, int maxIterations, const EnvironmentConfig<Frame>& environmentConfig) {
+    WheelData<X<Frame>> tireForcesX;
+    WheelData<Y<Frame>> tireForcesY;
+    WheelData<Z<Frame>> tireMomentsZ;
+    WheelData<Alpha<Frame>> slipAngles;
+    Y<Frame> latAcc{0};
     float error;
     int iterations = 0;
 
@@ -146,17 +133,16 @@ std::array<float, 2> Vehicle<VFrame>::getLatAccAndYawMoment(
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
             tires[i].value->calculate(loads[i], slipAngles[i], 0);
-            auto f = tires[i].value->getForce();
-            auto t = tires[i].value->getTorque();
-            tireForcesX[i] = f.value.x;
-            tireForcesY[i] = f.value.y;
-            tireMomentsZ[i] = t.z;
+
+            tireForcesX[i] = tires[i].value->getForce().value.x;
+            tireForcesY[i] = tires[i].value->getForce().value.y;
+            tireMomentsZ[i] = tires[i].value->getTorque().z;
         }
 
         auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);
         error = std::abs(latAcc.v - newLatAcc.v);
         latAcc = newLatAcc;
-        state.angularVelocity.z = Z<VFrame>{latAcc.v / state.velocity.getLength()};
+        state.angularVelocity.z = Z<Frame>{latAcc.v / state.velocity.getLength()};
 
         loads = totalTireLoads(latAcc, environmentConfig);
     } while (error > tolerance && iterations < maxIterations);
@@ -181,38 +167,38 @@ std::array<float, 2> Vehicle<VFrame>::getLatAccAndYawMoment(
     return {latAcc.v, yawMoment};
 }
 
-template <typename VFrame>
-void Vehicle<VFrame>::setSteering(Alpha<VFrame> steeringAngle) {
+template <typename Frame>
+void Vehicle<Frame>::setSteering(Alpha<Frame> steeringAngle) {
     state.steeringAngle = steeringAngle;
-    state.wheelAngles.FL = Alpha<VFrame>(state.steeringAngle);
-    state.wheelAngles.FR = Alpha<VFrame>(state.steeringAngle);
-    state.wheelAngles.RL = Alpha<VFrame>(0);
-    state.wheelAngles.RR = Alpha<VFrame>(0);
+    state.wheelAngles.FL = Alpha<Frame>(state.steeringAngle);
+    state.wheelAngles.FR = Alpha<Frame>(state.steeringAngle);
+    state.wheelAngles.RL = Alpha<Frame>(0);
+    state.wheelAngles.RR = Alpha<Frame>(0);
 }
 
-template <typename VFrame>
-WheelData<Alpha<VFrame>> Vehicle<VFrame>::calculateSlipAngles() {
+template <typename Frame>
+WheelData<Alpha<Frame>> Vehicle<Frame>::calculateSlipAngles() {
     float massToFront = combinedTotalMass.position.x.v;
     float massToRear = trackDistance - massToFront;
 
-    WheelData<Alpha<VFrame>> slipAngle;
+    WheelData<Alpha<Frame>> slipAngle;
 
-    slipAngle.FL = Alpha<VFrame>{static_cast<float>(
+    slipAngle.FL = Alpha<Frame>{static_cast<float>(
         std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
                   (state.velocity.x.v - state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
         state.wheelAngles.FL.v - toeAngle.FL.v)};
 
-    slipAngle.FR = Alpha<VFrame>{static_cast<float>(
+    slipAngle.FR = Alpha<Frame>{static_cast<float>(
         std::atan((state.velocity.y.v + state.angularVelocity.z.v * massToFront) /
                   (state.velocity.x.v + state.angularVelocity.z.v * frontTrackWidth / 2.0)) -
         state.wheelAngles.FR.v - toeAngle.FR.v)};
 
-    slipAngle.RL = Alpha<VFrame>{static_cast<float>(
+    slipAngle.RL = Alpha<Frame>{static_cast<float>(
         std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
                   (state.velocity.x.v - state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
         state.wheelAngles.RL.v - toeAngle.RL.v)};
 
-    slipAngle.RR = Alpha<VFrame>{static_cast<float>(
+    slipAngle.RR = Alpha<Frame>{static_cast<float>(
         std::atan((state.velocity.y.v - state.angularVelocity.z.v * massToRear) /
                   (state.velocity.x.v + state.angularVelocity.z.v * rearTrackWidth / 2.0)) -
         state.wheelAngles.RR.v - toeAngle.RR.v)};
@@ -220,52 +206,52 @@ WheelData<Alpha<VFrame>> Vehicle<VFrame>::calculateSlipAngles() {
     return slipAngle;
 }
 
-template <typename VFrame>
-Y<VFrame> Vehicle<VFrame>::calculateLatAcc(const WheelData<X<VFrame>>& tireForcesX,
-                                           const WheelData<Y<VFrame>>& tireForcesY) {
+template <typename Frame>
+Y<Frame> Vehicle<Frame>::calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
+                                           const WheelData<Y<Frame>>& tireForcesY) {
     auto vehicleFy = getVehicleFyFromTireForces(tireForcesX, tireForcesY);
     float latForce = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         latForce += vehicleFy[i].v;
     }
-    return Y<VFrame>{latForce / combinedTotalMass.value};
+    return Y<Frame>{latForce / combinedTotalMass.value};
 }
 
-template <typename VFrame>
-WheelData<Y<VFrame>> Vehicle<VFrame>::getVehicleFyFromTireForces(
-    const WheelData<X<VFrame>>& tireFx, const WheelData<Y<VFrame>>& tireFy) {
-    WheelData<Y<VFrame>> vehicleFy;
+template <typename Frame>
+WheelData<Y<Frame>> Vehicle<Frame>::getVehicleFyFromTireForces(
+    const WheelData<X<Frame>>& tireFx, const WheelData<Y<Frame>>& tireFy) {
+    WheelData<Y<Frame>> vehicleFy;
 
     float deltaFL = state.wheelAngles.FL.v;
     float deltaFR = state.wheelAngles.FR.v;
 
-    vehicleFy.FL = Y<VFrame>{tireFx.FL.v * std::sin(deltaFL) + tireFy.FL.v * std::cos(deltaFL)};
-    vehicleFy.FR = Y<VFrame>{tireFx.FR.v * std::sin(deltaFR) + tireFy.FR.v * std::cos(deltaFR)};
+    vehicleFy.FL = Y<Frame>{tireFx.FL.v * std::sin(deltaFL) + tireFy.FL.v * std::cos(deltaFL)};
+    vehicleFy.FR = Y<Frame>{tireFx.FR.v * std::sin(deltaFR) + tireFy.FR.v * std::cos(deltaFR)};
     vehicleFy.RL = tireFy.RL;
     vehicleFy.RR = tireFy.RR;
 
     return vehicleFy;
 }
 
-template <typename VFrame>
-WheelData<X<VFrame>> Vehicle<VFrame>::getVehicleFxFromTireForces(
-    const WheelData<X<VFrame>>& tireFx, const WheelData<Y<VFrame>>& tireFy) {
-    WheelData<X<VFrame>> vehicleFx;
+template <typename Frame>
+WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(
+    const WheelData<X<Frame>>& tireFx, const WheelData<Y<Frame>>& tireFy) {
+    WheelData<X<Frame>> vehicleFx;
 
     float deltaFL = state.wheelAngles.FL.v;
     float deltaFR = state.wheelAngles.FR.v;
 
-    vehicleFx.FL = X<VFrame>{tireFx.FL.v * std::cos(deltaFL) - tireFy.FL.v * std::sin(deltaFL)};
-    vehicleFx.FR = X<VFrame>{tireFx.FR.v * std::cos(deltaFR) - tireFy.FR.v * std::sin(deltaFR)};
+    vehicleFx.FL = X<Frame>{tireFx.FL.v * std::cos(deltaFL) - tireFy.FL.v * std::sin(deltaFL)};
+    vehicleFx.FR = X<Frame>{tireFx.FR.v * std::cos(deltaFR) - tireFy.FR.v * std::sin(deltaFR)};
     vehicleFx.RL = tireFx.RL;
     vehicleFx.RR = tireFx.RR;
 
     return vehicleFx;
 }
 
-template <typename VFrame>
-WheelData<float> Vehicle<VFrame>::totalTireLoads(
-    Y<VFrame> latAcc, const EnvironmentConfig<VFrame>& environmentConfig) {
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::totalTireLoads(
+    Y<Frame> latAcc, const EnvironmentConfig<Frame>& environmentConfig) {
     auto static_load = staticLoad(environmentConfig.earthAcc);
     auto aero = aeroLoad(environmentConfig);
     auto transfer = loadTransfer(latAcc);
@@ -276,8 +262,8 @@ WheelData<float> Vehicle<VFrame>::totalTireLoads(
     return tireLoads;
 }
 
-template <typename VFrame>
-WheelData<float> Vehicle<VFrame>::staticLoad(float earthAcc) {
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::staticLoad(float earthAcc) {
     WheelData<float> loads;
     for (int i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         loads[i] = (nonSuspendedMassAtWheels[i] + suspendedMassAtWheels[i]) * earthAcc;
@@ -285,8 +271,8 @@ WheelData<float> Vehicle<VFrame>::staticLoad(float earthAcc) {
     return loads;
 }
 
-template <typename VFrame>
-WheelData<float> Vehicle<VFrame>::distributeForces(float totalForce, float frontDist,
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::distributeForces(float totalForce, float frontDist,
                                                    float leftDist) {
     WheelData<float> forces;
     forces.FL = totalForce * (trackDistance - frontDist) / trackDistance *
@@ -300,15 +286,15 @@ WheelData<float> Vehicle<VFrame>::distributeForces(float totalForce, float front
     return forces;
 }
 
-template <typename VFrame>
-WheelData<float> Vehicle<VFrame>::aeroLoad(const EnvironmentConfig<VFrame>& environmentConfig) {
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::aeroLoad(const EnvironmentConfig<Frame>& environmentConfig) {
     aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
     // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
     return distributeForces(-aero.value.getForce().value.z.v, aero.position.x.v, aero.position.y.v);
 }
 
-template <typename VFrame>
-WheelData<float> Vehicle<VFrame>::loadTransfer(Y<VFrame> latAcc) {
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::loadTransfer(Y<Frame> latAcc) {
     float ay = latAcc.v;
 
     float nonSuspendedMassFront = combinedNonSuspendedMass.value *
