@@ -9,11 +9,6 @@ Aero<Frame>::Aero(const VehicleConfig<Frame>& config) : cla(config.cla) {}
 
 template <typename Frame>
 void Aero<Frame>::calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind) {
-    calculateForces(state, airDensity, wind);
-}
-
-template <typename Frame>
-void Aero<Frame>::calculateForces(VehicleState<Frame> state, float airDensity, Vec<Frame> wind) {
     downforce(state, airDensity, wind);
 }
 

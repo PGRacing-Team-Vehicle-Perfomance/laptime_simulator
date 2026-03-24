@@ -12,12 +12,12 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename VFrame>
+template <typename Frame>
 class Vehicle {
-    Mass<VFrame> combinedTotalMass;
+    Mass<Frame> combinedTotalMass;
 
-    Mass<VFrame> combinedNonSuspendedMass;
-    Mass<VFrame> combinedSuspendedMass;
+    Mass<Frame> combinedNonSuspendedMass;
+    Mass<Frame> combinedSuspendedMass;
 
     WheelData<float> nonSuspendedMassAtWheels;
     WheelData<float> suspendedMassAtWheels;
@@ -32,40 +32,37 @@ class Vehicle {
     float rearTrackWidth;
     float trackDistance;
 
-    WheelData<Alpha<VFrame>> toeAngle;
+    WheelData<Alpha<Frame>> toeAngle;
 
-    VehicleState<VFrame> state;
+    VehicleState<Frame> state;
 
-    Positioned<Aero<VFrame>, VFrame> aero;
+    Positioned<Aero<Frame>, Frame> aero;
 
-    WheelData<Positioned<std::unique_ptr<TireBase<VFrame>>, VFrame>> tires;
+    WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
     std::array<float, 2> getLatAccAndYawMoment(float tolerance, int maxIterations,
-                                               const EnvironmentConfig<VFrame>& environmentConfig);
-    WheelData<Alpha<VFrame>> calculateSlipAngles();
-    void setSteering(Alpha<VFrame> steeringAngle);
+                                               const EnvironmentConfig<Frame>& environmentConfig);
+    WheelData<Alpha<Frame>> calculateSlipAngles();
+    void setSteering(Alpha<Frame> steeringAngle);
     WheelData<float> staticLoad(float earthAcc);
-    Y<VFrame> calculateLatAcc(const WheelData<X<VFrame>>& tireForcesX,
-                             const WheelData<Y<VFrame>>& tireForcesY);
+    Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
+                             const WheelData<Y<Frame>>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    WheelData<float> totalTireLoads(Y<VFrame> latAcc,
-                                    const EnvironmentConfig<VFrame>& environmentConfig);
-    WheelData<float> aeroLoad(const EnvironmentConfig<VFrame>& environmentConfig);
-    WheelData<float> loadTransfer(Y<VFrame> latAcc);
-    WheelData<Y<VFrame>> getVehicleFyFromTireForces(const WheelData<X<VFrame>>& tireFx,
-                                                   const WheelData<Y<VFrame>>& tireFy);
-    WheelData<X<VFrame>> getVehicleFxFromTireForces(const WheelData<X<VFrame>>& tireFx,
-                                                   const WheelData<Y<VFrame>>& tireFy);
-    VehicleState<VFrame> springing(WheelData<float> loads);
+    WheelData<float> totalTireLoads(Y<Frame> latAcc,
+                                    const EnvironmentConfig<Frame>& environmentConfig);
+    WheelData<float> aeroLoad(const EnvironmentConfig<Frame>& environmentConfig);
+    WheelData<float> loadTransfer(Y<Frame> latAcc);
+    WheelData<Y<Frame>> getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                   const WheelData<Y<Frame>>& tireFy);
+    WheelData<X<Frame>> getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                   const WheelData<Y<Frame>>& tireFy);
+    VehicleState<Frame> springing(WheelData<float> loads);
    public:
-    Vehicle(const VehicleConfig<VFrame>& vehicleConfig, WheelData<Positioned<std::unique_ptr<TireBase<VFrame>>, VFrame>>&& tires);
+    Vehicle(const VehicleConfig<Frame>& vehicleConfig, WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires);
     Vehicle() = default;
 
-    template <typename InternalTireFrame>
-    void makeTires(const TireConfig& tireConfig);
-
     std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
-        float speed, const EnvironmentConfig<VFrame>& environmentConfig, float maxSteeringAngle = 10,
+        float speed, const EnvironmentConfig<Frame>& environmentConfig, float maxSteeringAngle = 10,
         float steeringAngleStep = 1, float maxSlipAngle = 10, float slipAngleStep = 1,
         float tolerance = 0.01, int maxIterations = 100);
 };
