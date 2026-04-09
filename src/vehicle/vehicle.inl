@@ -11,7 +11,6 @@
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
-#include "vehicle/tire/tirePacejka.h"
 #include "vehicle/vehicleHelper.h"
 
 template <typename Frame>
@@ -277,11 +276,7 @@ WheelData<float> Vehicle<Frame>::distributeForces(float totalForce, float frontD
 
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::aeroLoad(const Config& config) {
-    float airTemp = config.get("Environment", "airTemperature");
-    float airPress = config.get("Environment", "airPressure");
-    float airHumid = config.get("Environment", "airHumidity");
-    float airDensityVal = config.get("Environment", "airDensity", 
-                             airDensity(airTemp, airPress, airHumid));
+    float airDensityVal = config.get("Environment", "airDensity");
     Vec<Frame> wind = config.getVec<Frame>("Environment", "wind");
 
     aero.value.calculate(state, airDensityVal, wind);

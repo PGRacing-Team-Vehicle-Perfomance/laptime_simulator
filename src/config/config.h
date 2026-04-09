@@ -60,6 +60,10 @@ public:
                 }
             }
         }
+
+        if(data.find("Environment.airDensity") == data.end()) {
+            data["Environment.airDensity"] = airDensity(data["Environment.airTemperature"], data["Environment.airPressure"], data["Environment.airHumidity"]);
+        }
     }
 
     float get(const std::string& module, const std::string& param) const {

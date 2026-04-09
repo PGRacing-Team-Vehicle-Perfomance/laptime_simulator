@@ -6,6 +6,7 @@ Environment,earthAcc,9.81
 Environment,wind.x,0
 Environment,wind.y,0
 Environment,wind.z,0
+Vehicle,frame,ISO8855
 Vehicle,nonSuspendedMassAtWheels.FL,7.5
 Vehicle,nonSuspendedMassAtWheels.FR,7.5
 Vehicle,nonSuspendedMassAtWheels.RL,8
@@ -36,6 +37,7 @@ Vehicle,toeAngle.FL,0
 Vehicle,toeAngle.FR,0
 Vehicle,toeAngle.RL,0
 Vehicle,toeAngle.RR,0
+Tire,frame,SAE
 Tire,implementation,PacejkaV1
 Tire,PCY1,1.73993
 Tire,PDY1,3.22192
@@ -59,3 +61,10 @@ Tire,FNOMIN,3000
 SkidPad,errDelta,0.001
 SkidPad,maxIterConv,10
 SkidPad,diameter,1.3
+Simlation,maxSlipAngle,20
+Simlation,maxSteeringAngle,20
+Simlation,slipAngleStep,1
+Simlation,steeringAngleStep,2
+Simlation,speed,11
+Simlation,tolerance,0.01
+Simlation,maxIterations,100
