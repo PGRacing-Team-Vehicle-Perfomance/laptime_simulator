@@ -15,19 +15,19 @@
 #include "vehicle/vehicleHelper.h"
 
 template <typename Frame>
-Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
+Vehicle<Frame>::Vehicle(const Config& config,
                         WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires)
-    : rollCenterHeightFront(vehicleConfig.rollCenterHeightFront),
-      rollCenterHeightBack(vehicleConfig.rollCenterHeightBack),
-      frontTrackWidth(vehicleConfig.frontTrackWidth),
-      rearTrackWidth(vehicleConfig.rearTrackWidth),
-      trackDistance(vehicleConfig.trackDistance),
-      toeAngle(vehicleConfig.toeAngle),
-      suspendedMassAtWheels(vehicleConfig.suspendedMassAtWheels),
-      nonSuspendedMassAtWheels(vehicleConfig.nonSuspendedMassAtWheels),
+    : rollCenterHeightFront(config.get("Vehicle", "rollCenterHeightFront")),
+      rollCenterHeightBack(config.get("Vehicle", "rollCenterHeightBack")),
+      frontTrackWidth(config.get("Vehicle", "frontTrackWidth")),
+      rearTrackWidth(config.get("Vehicle", "rearTrackWidth")),
+      trackDistance(config.get("Vehicle", "trackDistance")),
+      toeAngle(config.getAlphaWheelData<Frame>("Vehicle", "toeAngle")),
+      suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
+      nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       tires(std::move(tires)) {
-    aero.value = {vehicleConfig};
-    aero.position = vehicleConfig.claPosition;
+    aero.value = {config};
+    aero.position = config.getVec<Frame>("Vehicle", "claPosition");
 
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
@@ -56,7 +56,7 @@ Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
 
     combinedSuspendedMass.position.x.v /= combinedSuspendedMass.value;
     combinedSuspendedMass.position.y.v /= combinedSuspendedMass.value;
-    combinedSuspendedMass.position.z.v = vehicleConfig.suspendedMassHeight;
+    combinedSuspendedMass.position.z.v = config.get("Vehicle", "suspendedMassHeight");
 
     combinedTotalMass.value = combinedSuspendedMass.value + combinedNonSuspendedMass.value;
     combinedTotalMass.position = {
@@ -71,25 +71,25 @@ Vehicle<Frame>::Vehicle(const VehicleConfig<Frame>& vehicleConfig,
             combinedTotalMass.value};
 
     float frontSpringWheelRate =
-        vehicleConfig.frontKspring / std::pow(vehicleConfig.frontSpringMotionRatio, 2);
+        config.get("Vehicle", "frontKspring") / std::pow(config.get("Vehicle", "frontSpringMotionRatio"), 2);
     float frontTorqueSpring =
         std::pow(frontTrackWidth, 2) * std::tan(M_PI / 180) * frontSpringWheelRate / 2;
-    float frontArbTorque = vehicleConfig.frontKarb * std::pow(vehicleConfig.frontTrackWidth, 2) *
-                           std::tan(M_PI / 180) / std::pow(vehicleConfig.frontArbMotionRatio, 2);
+    float frontArbTorque = config.get("Vehicle", "frontKarb") * std::pow(frontTrackWidth, 2) *
+                           std::tan(M_PI / 180) / std::pow(config.get("Vehicle", "frontArbMotionRatio"), 2);
     antiRollStiffnessFront = frontArbTorque + frontTorqueSpring;
 
     float rearSpringWheelRate =
-        vehicleConfig.rearKspring / std::pow(vehicleConfig.rearSpringMotionRatio, 2);
+        config.get("Vehicle", "rearKspring") / std::pow(config.get("Vehicle", "rearSpringMotionRatio"), 2);
     float rearTorqueSpring =
         std::pow(rearTrackWidth, 2) * std::tan(M_PI / 180) * rearSpringWheelRate / 2;
-    float rearArbTorque = vehicleConfig.rearKarb * std::pow(vehicleConfig.rearTrackWidth, 2) *
-                          std::tan(M_PI / 180) / std::pow(vehicleConfig.rearArbMotionRatio, 2);
+    float rearArbTorque = config.get("Vehicle", "rearKarb") * std::pow(rearTrackWidth, 2) *
+                          std::tan(M_PI / 180) / std::pow(config.get("Vehicle", "rearArbMotionRatio"), 2);
     antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
 }
 
 template <typename Frame>
 std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
-    float tolerance, int maxIterations, const EnvironmentConfig<Frame>& environmentConfig) {
+    float tolerance, int maxIterations, const Config& config) {
     WheelData<X<Frame>> tireForcesX;
     WheelData<Y<Frame>> tireForcesY;
     WheelData<Z<Frame>> tireMomentsZ;
@@ -100,7 +100,8 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
 
     state.angularVelocity.setLength(0);
 
-    auto loads = staticLoad(environmentConfig.earthAcc);
+    float earthAcc = config.get("Environment", "earthAcc");
+    auto loads = staticLoad(earthAcc);
     do {
         iterations++;
         slipAngles = calculateSlipAngles();
@@ -118,7 +119,7 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         latAcc = newLatAcc;
         state.angularVelocity.z = Z<Frame>{latAcc.v / state.velocity.getLength()};
 
-        loads = totalTireLoads(latAcc, environmentConfig);
+        loads = totalTireLoads(latAcc, config);
     } while (error > tolerance && iterations < maxIterations);
 
     float yawMomentFromTires = 0;
@@ -238,9 +239,10 @@ WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(const WheelData<X
 
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc,
-                                                const EnvironmentConfig<Frame>& environmentConfig) {
-    auto static_load = staticLoad(environmentConfig.earthAcc);
-    auto aero = aeroLoad(environmentConfig);
+                                                const Config& config) {
+    float earthAcc = config.get("Environment", "earthAcc");
+    auto static_load = staticLoad(earthAcc);
+    auto aero = aeroLoad(config);
     auto transfer = loadTransfer(latAcc);
     WheelData<float> tireLoads;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
@@ -274,8 +276,15 @@ WheelData<float> Vehicle<Frame>::distributeForces(float totalForce, float frontD
 }
 
 template <typename Frame>
-WheelData<float> Vehicle<Frame>::aeroLoad(const EnvironmentConfig<Frame>& environmentConfig) {
-    aero.value.calculate(state, environmentConfig.airDensity, environmentConfig.wind);
+WheelData<float> Vehicle<Frame>::aeroLoad(const Config& config) {
+    float airTemp = config.get("Environment", "airTemperature");
+    float airPress = config.get("Environment", "airPressure");
+    float airHumid = config.get("Environment", "airHumidity");
+    float airDensityVal = config.get("Environment", "airDensity", 
+                             airDensity(airTemp, airPress, airHumid));
+    Vec<Frame> wind = config.getVec<Frame>("Environment", "wind");
+
+    aero.value.calculate(state, airDensityVal, wind);
     // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
     return distributeForces(-aero.value.getForce().value.z.v, aero.position.x.v, aero.position.y.v);
 }

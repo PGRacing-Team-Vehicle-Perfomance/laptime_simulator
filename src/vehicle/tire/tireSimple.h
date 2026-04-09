@@ -13,7 +13,7 @@ class TireSimple : public Tire<Internal, External> {
     void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) override;
    public:
     TireSimple() = default;
-    TireSimple(const TireConfig& config, bool isDriven);
+    TireSimple(const Config& config, bool isDriven);
 };
 
 #include "tireSimple.inl"

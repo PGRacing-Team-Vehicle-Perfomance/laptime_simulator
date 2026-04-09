@@ -3,10 +3,13 @@
 #include "config/config.h"
 #include "vehicle/tire/tire.h"
 
+#ifndef SIDE_ENUM_DEFINED
+#define SIDE_ENUM_DEFINED
 enum Side { Left, Right };
+#endif
 
 template <typename Internal, typename External>
-class TirePacejka : public Tire<Internal, External> {
+class TirePacejkaV1 : public Tire<Internal, External> {
     Side sideRelativeToVehicle;
 
     float PCY1;
@@ -30,8 +33,8 @@ class TirePacejka : public Tire<Internal, External> {
     float FNOMIN;
     void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) override;
    public:
-    TirePacejka() = default;
-    TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle);
+    TirePacejkaV1() = default;
+    TirePacejkaV1(const Config& config, bool isDriven, Side sideRelativeToVehicle);
 };
 
 #include "tirePacejka.inl"

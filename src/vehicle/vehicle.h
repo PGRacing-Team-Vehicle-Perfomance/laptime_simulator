@@ -46,8 +46,8 @@ class Vehicle {
                              const WheelData<Y<Frame>>& tireForcesY);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
     WheelData<float> totalTireLoads(Y<Frame> latAcc,
-                                    const EnvironmentConfig<Frame>& environmentConfig);
-    WheelData<float> aeroLoad(const EnvironmentConfig<Frame>& environmentConfig);
+                                    const Config& config);
+    WheelData<float> aeroLoad(const Config& config);
     WheelData<float> loadTransfer(Y<Frame> latAcc);
     WheelData<Y<Frame>> getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
@@ -55,7 +55,7 @@ class Vehicle {
                                                    const WheelData<Y<Frame>>& tireFy);
 
    public:
-    Vehicle(const VehicleConfig<Frame>& vehicleConfig,
+    Vehicle(const Config& config,
             WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires);
     Vehicle() = default;
 
@@ -64,7 +64,7 @@ class Vehicle {
     void setSpeed(float speed);
 
     std::array<float, 2> calculateLatAccAndYawMoment(float tolerance, int maxIterations,
-                                               const EnvironmentConfig<Frame>& environmentConfig);
+                                               const Config& config);
 };
 
 #include "vehicle.inl"
