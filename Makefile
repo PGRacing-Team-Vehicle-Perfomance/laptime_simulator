@@ -5,6 +5,7 @@ BUILD_TYPE ?= Release
 EXECUTABLE := $(BUILD_DIR)/laptime_simulator
 VENV_DIR := .venv
 PYTHON := $(VENV_DIR)/bin/python
+CONFIG ?= 
 
 all: build
 
@@ -18,9 +19,12 @@ build:
 debug:
 	@$(MAKE) build BUILD_TYPE=Debug
 
-run: build
+run:
+ifeq ($(CONFIG),)
+	$(error CONFIG variable must be explicitly set. Example: make run CONFIG=config_pacejka_v1.csv)
+endif
 	@echo "=== Running laptime_simulator ==="
-	@$(EXECUTABLE)
+	@$(EXECUTABLE) $(CONFIG)
 
 venv: $(VENV_DIR)/bin/activate
 
@@ -47,8 +51,8 @@ help:
 	@echo "Targets:"
 	@echo "  build    Build Release (default)"
 	@echo "  debug    Build Debug"
-	@echo "  run      Build and run"
-	@echo "  plot     Build, run and generate plot"
+	@echo "  run      Run"
+	@echo "  plot     Run and generate plot"
 	@echo "  venv     Create Python virtual environment"
 	@echo "  rebuild  Clean and rebuild"
 	@echo "  clean    Remove build directory"
@@ -57,4 +61,5 @@ help:
 	@echo "Examples:"
 	@echo "  make"
 	@echo "  make debug"
-	@echo "  make run"
+	@echo "  make run CONFIG=config_pacejka_v1.csv"
+	@echo "  make plot CONFIG=config_simple.csv"
