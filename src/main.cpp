@@ -4,6 +4,7 @@
 #include "config/config.h"
 #include "vehicle/vehicle.h"
 #include "vehicle/tire/tirePacejkaV2.h"
+#include "vehicle/tire/tireSimple.h"
 
 template <typename Frame>
 std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
@@ -34,18 +35,28 @@ int main() {
     using VehicleFrame = ISO8855;
     using TireFrame = SAE;
 
-    Config cfg("config.csv");
+    Config cfg("config_pacejka_v1.csv");
 
     // later will be part of vehicle builder
     WheelData<Positioned<std::unique_ptr<TireBase<VehicleFrame>>, VehicleFrame>> tires;
-    tires.FL.value =
-        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Left);
-    tires.FR.value =
-        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Right);
-    tires.RL.value =
-        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Left);
-    tires.RR.value =
-        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Right);
+    
+    std::string impl = cfg.getString("Tire", "implementation");
+    auto createTire = [&cfg, &impl](Side side) -> std::unique_ptr<TireBase<VehicleFrame>> {
+        if (impl == "Simple") {
+            return std::make_unique<TireSimple<TireFrame, VehicleFrame>>(cfg, false);
+        } else if (impl == "PacejkaV2") {
+            return std::make_unique<TirePacejkaV2<TireFrame, VehicleFrame>>(cfg, false, side);
+        } else if (impl == "PacejkaV1"  ) {
+            return std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, side);
+        } else {
+            throw std::runtime_error("Unknown tire implementation: " + impl);
+        }
+    };
+
+    tires.FL.value = createTire(Left);
+    tires.FR.value = createTire(Right);
+    tires.RL.value = createTire(Left);
+    tires.RR.value = createTire(Right);
 
     Vehicle<VehicleFrame> v(cfg, std::move(tires));
 

@@ -15,6 +15,7 @@
 class Config {
 private:
     std::unordered_map<std::string, float> data;
+    std::unordered_map<std::string, std::string> stringData;
 
 public:
     Config() = default;
@@ -44,11 +45,18 @@ public:
             if (std::getline(ss, module, ',') &&
                 std::getline(ss, param, ',') &&
                 std::getline(ss, valueStr, ',')) {
+                
+                if (!valueStr.empty() && valueStr.back() == '\r') {
+                    valueStr.pop_back();
+                }
+                
+                stringData[module + "." + param] = valueStr;
+                
                 try {
                     float value = std::stof(valueStr);
                     data[module + "." + param] = value;
                 } catch (const std::exception& e) {
-                    std::cerr << "Failed to parse value for " << module << "." << param << ": " << valueStr << "\n";
+                    // Fail silently for floats, it might be a valid intentional text field
                 }
             }
         }
@@ -68,6 +76,15 @@ public:
         std::string key = module + "." + param;
         auto it = data.find(key);
         if (it != data.end()) {
+            return it->second;
+        }
+        return defaultVal;
+    }
+
+    std::string getString(const std::string& module, const std::string& param, const std::string& defaultVal = "") const {
+        std::string key = module + "." + param;
+        auto it = stringData.find(key);
+        if (it != stringData.end()) {
             return it->second;
         }
         return defaultVal;
