@@ -10,7 +10,7 @@ class Aero : public ForcefullObject<Frame> {
     void downforce(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
 
    public:
-    Aero(const VehicleConfig<Frame>& config);
+    Aero(const Config& config);
     Aero() = default;
     void calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind = {});
 };

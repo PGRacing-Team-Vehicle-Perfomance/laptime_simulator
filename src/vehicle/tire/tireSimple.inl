@@ -7,11 +7,11 @@
 #include "types.h"
 
 template <typename Internal, typename External>
-TireSimple<Internal, External>::TireSimple(const TireConfig& config, bool isDriven)
+TireSimple<Internal, External>::TireSimple(const Config& config, bool isDriven)
     : Tire<Internal, External>(config, isDriven),
-      scalingFactor(config.scalingFac),
-      quadFac(config.quadFac),
-      linFac(config.linFac) {}
+      scalingFactor(config.get("Tire", "scalingFac")),
+      quadFac(config.get("Tire", "quadFac")),
+      linFac(config.get("Tire", "linFac")) {}
 
 template <typename Internal, typename External>
 float TireSimple<Internal, External>::calculateForce(float verticalLoad, bool isLateral) {

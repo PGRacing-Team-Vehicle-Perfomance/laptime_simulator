@@ -5,7 +5,7 @@
 #include "types.h"
 
 template <typename Frame>
-Aero<Frame>::Aero(const VehicleConfig<Frame>& config) : cla(config.cla) {}
+Aero<Frame>::Aero(const Config& config) : cla(config.get("Vehicle", "cla")) {}
 
 template <typename Frame>
 void Aero<Frame>::calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind) {

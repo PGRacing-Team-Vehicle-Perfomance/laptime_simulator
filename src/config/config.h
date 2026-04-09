@@ -1,85 +1,111 @@
 #pragma once
 
-#include "config/configHelper.cpp"
+#include "configHelper.cpp"
 #include "coordTypes.h"
 #include "types.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename Frame>
-struct EnvironmentConfig {
-    float airTemperature = 20;                                                  // [°C]
-    float airPressure = 100;                                                    // [kPa]
-    float airHumidity = 50;                                                     // [%]
-    float airDensity = ::airDensity(airTemperature, airPressure, airHumidity);  // [kg/m³]
-    float earthAcc = 9.81;                                                      // [m/s²]
-    Vec<Frame> wind;  //  amplitude [m/s] , angle [°] 0 = from North
-};
+#include <string>
+#include <unordered_map>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <iostream>
 
+class Config {
+private:
+    std::unordered_map<std::string, float> data;
 
-template <typename Frame>
-struct VehicleConfig {
-    WheelData<float> nonSuspendedMassAtWheels = {.FL = 7.5, .FR = 7.5, .RL = 8, .RR = 8};
-    WheelData<float> suspendedMassAtWheels = {.FL = 60, .FR = 60, .RL = 64.5, .RR = 64.5};
-    float suspendedMassHeight = 0.33;
+public:
+    Config() = default;
 
-    float rollCenterHeightFront = 0.0491;
-    float rollCenterHeightBack = 0.0539;
+    Config(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            file.open("../" + filename);
+        }
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open config file: " + filename);
+        }
 
-    float frontSpringMotionRatio = 1;
-    float frontArbMotionRatio = 1;
-    float frontKspring = 1;
-    float frontKarb = 1;
+        std::string line;
+        bool header = true;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
 
-    float rearSpringMotionRatio = 1;
-    float rearArbMotionRatio = 1;
-    float rearKspring = 1;
-    float rearKarb = 1;
-    // chasiss stiffness would need to be as Nm/deg front rear
+            if (header) {
+                header = false;
+                continue;
+            }
 
-    float frontTrackWidth = 1.256;
-    float rearTrackWidth = 1.216;
-    float trackDistance = 1.53;
+            std::stringstream ss(line);
+            std::string module, param, valueStr;
 
-    // Toe angles [deg] - positive = toe-in, negative = toe-out
-    WheelData<Alpha<Frame>> toeAngle = {.FL = Alpha<Frame>(0), .FR = Alpha<Frame>(0), .RL = Alpha<Frame>(0), .RR = Alpha<Frame>(0)};
+            if (std::getline(ss, module, ',') &&
+                std::getline(ss, param, ',') &&
+                std::getline(ss, valueStr, ',')) {
+                try {
+                    float value = std::stof(valueStr);
+                    data[module + "." + param] = value;
+                } catch (const std::exception& e) {
+                    std::cerr << "Failed to parse value for " << module << "." << param << ": " << valueStr << "\n";
+                }
+            }
+        }
+    }
 
-    float cla = 3.7;
+    float get(const std::string& module, const std::string& param) const {
+        std::string key = module + "." + param;
+        auto it = data.find(key);
+        if (it != data.end()) {
+            return it->second;
+        }
+        std::cerr << "Config parameter not found: " << key << "\n";
+        return 0.0f;
+    }
+    
+    float get(const std::string& module, const std::string& param, float defaultVal) const {
+        std::string key = module + "." + param;
+        auto it = data.find(key);
+        if (it != data.end()) {
+            return it->second;
+        }
+        return defaultVal;
+    }
 
-    // {0 0} geometric center of front axel
-    Vec<Frame> claPosition = Vec<Frame>(0.75, 0.0, 0.0);  // change to % maby
-};
+    template <typename T>
+    WheelData<T> getWheelData(const std::string& module, const std::string& prefix) const {
+        WheelData<T> wd;
+        wd.FL = static_cast<T>(get(module, prefix + ".FL"));
+        wd.FR = static_cast<T>(get(module, prefix + ".FR"));
+        wd.RL = static_cast<T>(get(module, prefix + ".RL"));
+        wd.RR = static_cast<T>(get(module, prefix + ".RR"));
+        return wd;
+    }
+    
+    template <typename Frame>
+    WheelData<Alpha<Frame>> getAlphaWheelData(const std::string& module, const std::string& prefix) const {
+        WheelData<Alpha<Frame>> wd;
+        wd.FL = Alpha<Frame>(get(module, prefix + ".FL"));
+        wd.FR = Alpha<Frame>(get(module, prefix + ".FR"));
+        wd.RL = Alpha<Frame>(get(module, prefix + ".RL"));
+        wd.RR = Alpha<Frame>(get(module, prefix + ".RR"));
+        return wd;
+    }
 
-// TODO: split into different configs for simple and pacejka and create implementation based on
-// provided
+    template <typename Frame>
+    Vec<Frame> getVec(const std::string& module, const std::string& prefix) const {
+        return Vec<Frame>(get(module, prefix + ".x"), get(module, prefix + ".y"), get(module, prefix + ".z"));
+    }
 
-struct TireConfig {
-    float scalingFac = 0.75;
-    float quadFac = -0.0002;
-    float linFac = 1.8284;
-
-    float PCY1 = 1.73993;
-    float PDY1 = 3.22192;
-    float PDY2 = 0.555412;
-    float PDY3 = 8.02593;
-    float PEY1 = 0.105808;
-    float PEY2 = -0.533932;
-    float PEY3 = 0.155092;
-    float PEY4 = 0.0330982;
-    float PKY1 = 31.8856;
-    float PKY2 = 2.01131;
-    float PKY3 = -0.0809452;
-    float PHY1 = 0.0605117;
-    float PHY2 = 0.0486026;
-    float PHY3 = -0.1913;
-    float PVY1 = 0.132828;
-    float PVY2 = 0.0325854;
-    float PVY3 = 2.70149;
-    float PVY4 = 1.12197;
-    float FNOMIN = 3000;
-};
-
-struct SkidPadConfig {
-    float errDelta = 0.001;
-    int maxIterConv = 10;
-    float diameter = 1.3;
+    std::unordered_map<std::string, float> getModule(const std::string& module) const {
+        std::unordered_map<std::string, float> result;
+        std::string prefix = module + ".";
+        for (const auto& pair : data) {
+            if (pair.first.rfind(prefix, 0) == 0) {
+                result[pair.first.substr(prefix.length())] = pair.second;
+            }
+        }
+        return result;
+    }
 };

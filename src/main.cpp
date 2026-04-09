@@ -3,10 +3,11 @@
 
 #include "config/config.h"
 #include "vehicle/vehicle.h"
+#include "vehicle/tire/tirePacejkaV2.h"
 
 template <typename Frame>
 std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
-    Vehicle<Frame>& v, float speed, const EnvironmentConfig<Frame>& environmentConfig,
+    Vehicle<Frame>& v, float speed, const Config& config,
     float maxSteeringAngle = 10, float steeringAngleStep = 1, float maxSlipAngle = 10,
     float slipAngleStep = 1, float tolerance = 0.01, int maxIterations = 100) {
     std::vector<std::array<float, 4>> out;
@@ -22,7 +23,7 @@ std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
             v.setChassisSlipAngle(Alpha<Frame>(chassisSlipAngle * M_PI / 180.f));
 
             std::array<float, 2> diagramPoint =
-                v.calculateLatAccAndYawMoment(tolerance, maxIterations, environmentConfig);
+                v.calculateLatAccAndYawMoment(tolerance, maxIterations, config);
             out.push_back({steeringAngle, chassisSlipAngle, diagramPoint[0], diagramPoint[1]});
         }
     }
@@ -33,24 +34,22 @@ int main() {
     using VehicleFrame = ISO8855;
     using TireFrame = SAE;
 
-    TireConfig tireConfig;
-    VehicleConfig<VehicleFrame> vehicleConfig;
-    EnvironmentConfig<VehicleFrame> environmentConfig;
+    Config cfg("config.csv");
 
     // later will be part of vehicle builder
     WheelData<Positioned<std::unique_ptr<TireBase<VehicleFrame>>, VehicleFrame>> tires;
     tires.FL.value =
-        std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Left);
+        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Left);
     tires.FR.value =
-        std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Right);
+        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Right);
     tires.RL.value =
-        std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Left);
+        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Left);
     tires.RR.value =
-        std::make_unique<TirePacejka<TireFrame, VehicleFrame>>(tireConfig, false, Right);
+        std::make_unique<TirePacejkaV1<TireFrame, VehicleFrame>>(cfg, false, Right);
 
-    Vehicle<VehicleFrame> v(vehicleConfig, std::move(tires));
+    Vehicle<VehicleFrame> v(cfg, std::move(tires));
 
-    auto points = getYawMomentDiagramPoints(v, 11, environmentConfig, 20, 2, 20, 1);
+    auto points = getYawMomentDiagramPoints(v, 11, cfg, 20, 2, 20, 1);
     FILE* f = fopen("build/yaw_diagram.csv", "w");
     if (f) {
         fprintf(f, "steering,slip,latAcc,yawMoment\n");

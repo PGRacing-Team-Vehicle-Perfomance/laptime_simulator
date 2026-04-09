@@ -10,34 +10,37 @@
 #include "coordTypes.h"
 #include "types.h"
 
+#ifndef SGN_FUNCTION_DEFINED
+#define SGN_FUNCTION_DEFINED
 inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
+#endif
 
 template <typename Internal, typename External>
-TirePacejka<Internal, External>::TirePacejka(const TireConfig& config, bool isDriven, Side sideRelativeToVehicle)
+TirePacejkaV1<Internal, External>::TirePacejkaV1(const Config& config, bool isDriven, Side sideRelativeToVehicle)
     : Tire<Internal, External>(config, isDriven),
       sideRelativeToVehicle(sideRelativeToVehicle),
-      PCY1(config.PCY1),
-      PDY1(config.PDY1),
-      PDY2(config.PDY2),
-      PDY3(config.PDY3),
-      PEY1(config.PEY1),
-      PEY2(config.PEY2),
-      PEY3(config.PEY3),
-      PEY4(config.PEY4),
-      PKY1(config.PKY1),
-      PKY2(config.PKY2),
-      PKY3(config.PKY3),
-      PHY1(config.PHY1),
-      PHY2(config.PHY2),
-      PHY3(config.PHY3),
-      PVY1(config.PVY1),
-      PVY2(config.PVY2),
-      PVY3(config.PVY3),
-      PVY4(config.PVY4),
-      FNOMIN(config.FNOMIN) {}
+      PCY1(config.get("Tire", "PCY1")),
+      PDY1(config.get("Tire", "PDY1")),
+      PDY2(config.get("Tire", "PDY2")),
+      PDY3(config.get("Tire", "PDY3")),
+      PEY1(config.get("Tire", "PEY1")),
+      PEY2(config.get("Tire", "PEY2")),
+      PEY3(config.get("Tire", "PEY3")),
+      PEY4(config.get("Tire", "PEY4")),
+      PKY1(config.get("Tire", "PKY1")),
+      PKY2(config.get("Tire", "PKY2")),
+      PKY3(config.get("Tire", "PKY3")),
+      PHY1(config.get("Tire", "PHY1")),
+      PHY2(config.get("Tire", "PHY2")),
+      PHY3(config.get("Tire", "PHY3")),
+      PVY1(config.get("Tire", "PVY1")),
+      PVY2(config.get("Tire", "PVY2")),
+      PVY3(config.get("Tire", "PVY3")),
+      PVY4(config.get("Tire", "PVY4")),
+      FNOMIN(config.get("Tire", "FNOMIN")) {}
 
 template <typename Internal, typename External>
-void TirePacejka<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
+void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
     float gamma = 0;

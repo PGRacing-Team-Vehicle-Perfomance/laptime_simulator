@@ -25,7 +25,7 @@ class Tire : public TireBase<External> {
     
    public:
     Tire() = default;
-    Tire(const TireConfig& config, bool isDriven) : isDriven(isDriven) {}
+    Tire(const Config& config, bool isDriven) : isDriven(isDriven) {}
     void calculate(float verticalLoad, Alpha<External> slipAngle, float slipRatio) override {
         calculateInternal(verticalLoad, toInternal(slipAngle), slipRatio);
         this->force = Force<External>(toExternal(internalForce.value), toExternal(internalForce.position));
