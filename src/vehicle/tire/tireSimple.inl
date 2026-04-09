@@ -15,7 +15,7 @@ TireSimple<Internal, External>::TireSimple(const Config& config, bool isDriven)
 
 template <typename Internal, typename External>
 float TireSimple<Internal, External>::calculateForce(float verticalLoad, bool isLateral) {
-    if (isDriven || isLateral) {
+    if (this->isDriven || isLateral) {
         return scalingFactor * (quadFac * std::pow(verticalLoad, 2) + linFac * verticalLoad);
     }
     return 0;
