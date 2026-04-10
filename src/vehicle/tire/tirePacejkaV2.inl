@@ -5,19 +5,12 @@
 #include <limits>
 #include <stdexcept>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #include "config/config.h"
 #include "coordTypes.h"
 #include "types.h"
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-// Guard against duplicate def in V1 and V2
-#ifndef SGN_FUNCTION_DEFINED
-#define SGN_FUNCTION_DEFINED
-inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
-#endif
 
 template <typename Internal, typename External>
 TirePacejkaV2<Internal, External>::TirePacejkaV2(const Config& config, bool isDriven, Side sideRelativeToVehicle)
@@ -31,18 +24,36 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
     float dfz = (Fz - FNOMIN) / FNOMIN;
 
     // ================= PURE LONGITUDINAL FORCE (FX) =================
+    
+    // Shifts
     float Shx = tp.at("PHX1") + tp.at("PHX2") * dfz * tp.at("LHX");
     float Svx = Fz * (tp.at("PVX1") + tp.at("PVX2") * dfz) * tp.at("LMUX") * tp.at("LVX");
+    
+    // Modified slip
     float kx = kappa + Shx;
+    
+    // Modified IA
     float gamma_x = gamma * tp.at("LGAX");
+    
+    // Shape factor
     float Cx = tp.at("PCX1") * tp.at("LCX");
+    
+    // Peak factor
     float Dx = Fz * (tp.at("PDX1") + tp.at("PDX2") * dfz) *
                (1.0 - tp.at("PDX3") * gamma * gamma) * tp.at("LMUX");
+    
+    // Longitudinal stiffness
     float Kx = Fz * (tp.at("PKX1") + tp.at("PKX2") * dfz) * exp(tp.at("PKX3") * dfz) *
                tp.at("LKX");
+    
+    // Stiffness factor
     float Bx = Kx / (Cx * Dx);
+    
+    // Curvature factor
     float Ex = (tp.at("PEX1") + tp.at("PEX2") * dfz + tp.at("PEX3") * dfz * dfz) *
-               (1.0 - tp.at("PEX4") * sgn(kx)) * tp.at("LEX");
+               (1.0 - tp.at("PEX4") * this->sgn(kx)) * tp.at("LEX");
+    
+    // Magic Formula
     float Fx = Dx * sin(Cx * atan(Bx * kx - Ex * (Bx * kx - atan(Bx * kx)))) + Svx;
 
     // ================= LATERAL FORCE =================
@@ -58,7 +69,7 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
                (1.0 - tp.at("PKY3") * std::fabs(gamma_y)) * tp.at("LKY") * tp.at("LFZ0");
     float By = Ky / (Cy * Dy);
     float Ey = (tp.at("PEY1") + tp.at("PEY2") * dfz) *
-               (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma_y) * sgn(ay)) * tp.at("LEY");
+               (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma_y) * this->sgn(ay)) * tp.at("LEY");
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Svy;
 
     // ================= MECHANICAL TRAIL =================
@@ -74,8 +85,12 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
                (1.0 + tp.at("QBZ5") * std::fabs(gamma_z)) * tp.at("LKY") / tp.at("LMUY");
     float Et = (tp.at("QEZ1") + tp.at("QEZ2") * dfz + tp.at("QEZ3") * dfz * dfz) *
                (1.0 + (tp.at("QEZ4") + tp.at("QEZ5") * gamma_z) * 2 / (M_PI)*atan(Bt * Ct * alpha));
+    double Shr = (tp.at("QEZ1") + tp.at("QEZ2") * dfz + tp.at("QEZ3") * dfz * dfz);
+    double Set= (1.0 + (tp.at("QEZ4") + tp.at("QEZ5") * gamma_z) * (2 / (M_PI))*atan(Bt * Ct*alpha));
     
+    // Limit Et to <= 1 (MF2002 standard safeguard)
     if (Et > 1.0) Et = 1.0;
+
     float t = Dt * std::cos(Ct * std::atan(Bt * alpha_t - Et * (Bt * alpha_t - std::atan(Bt * alpha_t))));
 
     // ================= RESIDUAL ALIGNING MOMENT =================
@@ -100,7 +115,7 @@ template <typename Internal, typename External>
 void TirePacejkaV2<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
-    float gamma = 0; // Keeping camber at 0 as in original
+    float gamma = 0; // camber
     float kappa = slipRatio;
 
     MF2002(Fz, alpha, gamma, kappa);
