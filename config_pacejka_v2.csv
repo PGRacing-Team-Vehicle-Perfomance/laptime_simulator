@@ -137,7 +137,6 @@ Tire,LVMX,1
 Tire,LSGKP,1
 Tire,LSGAL,1
 Tire,LGYR,1
-
 Aero,frontalArea,1.0
 Aero,dragCoefficient,0.5
 Aero,liftCoefficientFront,-1.2

@@ -133,7 +133,7 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         ((vehicleFy.FL.v + vehicleFy.FR.v) * combinedTotalMass.position.x.v) -
         ((vehicleFy.RL.v + vehicleFy.RR.v) * (trackDistance - combinedTotalMass.position.x.v));
 
-    float yawMomentFromFx = (frontTrackWidth / 2) * (vehicleFx.FL.v - vehicleFx.FR.v) +
+    float yawMomentFromFx = (frontTrackWidth / 2) * (vehicleFx.FL.v - vehicleFx.FR.v) + // if center of mass is not in the middle of track, this is wrong
                             (rearTrackWidth / 2) * (vehicleFx.RL.v - vehicleFx.RR.v);
 
     // TODO: aero yaw moment

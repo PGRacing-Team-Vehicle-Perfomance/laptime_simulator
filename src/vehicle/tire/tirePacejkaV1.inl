@@ -10,11 +10,6 @@
 #include "coordTypes.h"
 #include "types.h"
 
-#ifndef SGN_FUNCTION_DEFINED
-#define SGN_FUNCTION_DEFINED
-inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
-#endif
-
 template <typename Internal, typename External>
 TirePacejkaV1<Internal, External>::TirePacejkaV1(const Config& config, bool isDriven, Side sideRelativeToVehicle)
     : Tire<Internal, External>(config, isDriven),
@@ -38,7 +33,7 @@ void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Al
     float Ky =
         FNOMIN * tp.at("PKY1") * sin(2.0 * atan(Fz / (tp.at("PKY2") * FNOMIN))) * (1.0 - tp.at("PKY3") * std::fabs(gamma));
     float By = Ky / (Cy * Dy);
-    float Ey = (tp.at("PEY1") + tp.at("PEY2") * dfz) * (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma) * sgn(ay));
+    float Ey = (tp.at("PEY1") + tp.at("PEY2") * dfz) * (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma) * this->sgn(ay));
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;

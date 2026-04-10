@@ -6,7 +6,9 @@
 
 template <typename External>
 class TireBase : public ForcefullObject<External>, public TorquedObject<External> {
-   public:
+  protected:
+    inline double sgn(double x) { return (x >= 0.0) ? 1.0 : -1.0; }
+  public:
     virtual ~TireBase() = default;
     virtual void calculate(float verticalLoad, Alpha<External> slipAngle, float slipRatio) = 0;
 };
