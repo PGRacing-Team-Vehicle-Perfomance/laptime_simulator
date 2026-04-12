@@ -107,7 +107,8 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
     float Mz = -t * Fy + Mzr;
 
     float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    this->internalTorque = Torque<Internal>(0, 0, Mz);
+    float MzSAE = sideRelativeToVehicle == Left ? -Mz : Mz;
+    this->internalTorque = Torque<Internal>(0, 0, MzSAE);
     this->internalForce = Force<Internal>(Vec<Internal>(Fx, FySAE, 0), Vec<Internal>(0, 0, 0));
 }
 
