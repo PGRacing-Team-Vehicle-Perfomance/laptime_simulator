@@ -68,25 +68,41 @@ struct Vec {
     }
 };
 
-enum class Axis { X, Y, Z };
+enum class Axis { X, Y, Z, IDENTITY };
 
 struct Rotation180 {
     Axis axis;
 
-    float x(float v) const { return axis == Axis::X ? v : -v; }
-    float y(float v) const { return axis == Axis::Y ? v : -v; }
-    float z(float v) const { return axis == Axis::Z ? v : -v; }
+    float x(float v) const { return (axis == Axis::X || axis == Axis::IDENTITY) ? v : -v; }
+    float y(float v) const { return (axis == Axis::Y || axis == Axis::IDENTITY) ? v : -v; }
+    float z(float v) const { return (axis == Axis::Z || axis == Axis::IDENTITY) ? v : -v; }
 
-    float alpha(float v) const { return axis == Axis::Z ? v : -v; }
-    float gamma(float v) const { return axis == Axis::X ? v : -v; }
-    float kappa(float v) const { return axis == Axis::Y ? v : -v; }
+    float alpha(float v) const { return (axis == Axis::Z || axis == Axis::IDENTITY) ? v : -v; }
+    float gamma(float v) const { return (axis == Axis::X || axis == Axis::IDENTITY) ? v : -v; }
+    float kappa(float v) const { return (axis == Axis::Y || axis == Axis::IDENTITY) ? v : -v; }
 };
 
 constexpr Rotation180 FLIP_YZ{Axis::X};
+constexpr Rotation180 IDENTITY{Axis::IDENTITY};
+
+template <typename From, typename To>
+struct Bridge {
+    static constexpr Rotation180 rotation = IDENTITY;
+};
+
+template <>
+struct Bridge<ISO8855, SAE> {
+    static constexpr Rotation180 rotation = FLIP_YZ;
+};
+
+template <>
+struct Bridge<SAE, ISO8855> {
+    static constexpr Rotation180 rotation = FLIP_YZ;
+};
 
 template <typename From, typename To>
 struct Transform {
-    Rotation180 rotation;
+    Rotation180 rotation = Bridge<From, To>::rotation;
 
     X<To> operator()(X<From> v) const { return X<To>{rotation.x(v.v)}; }
     Y<To> operator()(Y<From> v) const { return Y<To>{rotation.y(v.v)}; }
@@ -96,9 +112,6 @@ struct Transform {
     Kappa<To> operator()(Kappa<From> k) const { return Kappa<To>{rotation.kappa(k.v)}; }
     Vec<To> operator()(Vec<From> v) const { return {(*this)(v.x), (*this)(v.y), (*this)(v.z)}; }
 };
-
-constexpr Transform<ISO8855, SAE> isoToSae{FLIP_YZ};
-constexpr Transform<SAE, ISO8855> saeToIso{FLIP_YZ};
 
 template <typename From, typename To>
 struct FrameBridge {
