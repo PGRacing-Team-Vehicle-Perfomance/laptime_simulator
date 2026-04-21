@@ -53,6 +53,8 @@ class Vehicle {
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<X<Frame>> getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
+    WheelData<Y<Frame>> getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                           const WheelData<Y<Frame>>& tireFy);
 
    public:
     Vehicle(const Config& config,

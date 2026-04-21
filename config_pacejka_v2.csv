@@ -148,7 +148,7 @@ SkidPad,speedStep,1
 SkidPad,errDelta,0.001
 SkidPad,maxIterConv,10
 SkidPad,diameter,1.3
-Simlation,maxSlipAngle,20
+Simlation,maxSlipAngle,10
 Simlation,maxSteeringAngle,20
 Simlation,slipAngleStep,1
 Simlation,steeringAngleStep,2
