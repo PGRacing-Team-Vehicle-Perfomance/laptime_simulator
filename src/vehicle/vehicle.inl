@@ -196,10 +196,10 @@ WheelData<Alpha<Frame>> Vehicle<Frame>::calculateSlipAngles() {
 template <typename Frame>
 Y<Frame> Vehicle<Frame>::calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
                                          const WheelData<Y<Frame>>& tireForcesY) {
-    auto vehicleFy = getVehicleFyFromTireForces(tireForcesX, tireForcesY);
+    auto velocityFy =  getVelocityFyFromTireForces(tireForcesX, tireForcesY);
     float latForce = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        latForce += vehicleFy[i].v;
+        latForce += velocityFy[i].v;
     }
     return Y<Frame>{latForce / combinedTotalMass.value};
 }
@@ -234,6 +234,23 @@ WheelData<X<Frame>> Vehicle<Frame>::getVehicleFxFromTireForces(const WheelData<X
     vehicleFx.RR = tireFx.RR;
 
     return vehicleFx;
+}
+
+template <typename Frame>
+WheelData<Y<Frame>> Vehicle<Frame>::getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
+                                                                       const WheelData<Y<Frame>>& tireFy) {
+    WheelData<X<Frame>> vehicleFx = getVehicleFxFromTireForces(tireFx, tireFy);
+    WheelData<Y<Frame>> vehicleFy = getVehicleFyFromTireForces(tireFx, tireFy);
+
+    float chassisSlipAngle = std::atan2(state.velocity.y.v, state.velocity.x.v);
+
+    WheelData<Y<Frame>> velocityAlignedFy;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        velocityAlignedFy[i] = Y<Frame>{vehicleFy[i].v * std::cos(chassisSlipAngle) 
+                                        - vehicleFx[i].v * std::sin(chassisSlipAngle)};
+    }
+
+    return velocityAlignedFy;
 }
 
 template <typename Frame>
