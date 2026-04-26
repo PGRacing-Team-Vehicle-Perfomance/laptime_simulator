@@ -51,7 +51,7 @@ Vehicle<Frame>::Vehicle(const Config& config,
     }
     combinedNonSuspendedMass.position.x.v /= combinedNonSuspendedMass.value;
     combinedNonSuspendedMass.position.y.v /= combinedNonSuspendedMass.value;
-    combinedNonSuspendedMass.position.z.v = 0;
+    combinedNonSuspendedMass.position.z.v = config.get("Vehicle", "nonSuspendedMassHeight");
 
     combinedSuspendedMass.position.x.v /= combinedSuspendedMass.value;
     combinedSuspendedMass.position.y.v /= combinedSuspendedMass.value;

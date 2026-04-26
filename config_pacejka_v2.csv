@@ -11,20 +11,21 @@ Vehicle,nonSuspendedMassAtWheels.FL,7.5
 Vehicle,nonSuspendedMassAtWheels.FR,7.5
 Vehicle,nonSuspendedMassAtWheels.RL,8
 Vehicle,nonSuspendedMassAtWheels.RR,8
-Vehicle,suspendedMassAtWheels.FL,60
-Vehicle,suspendedMassAtWheels.FR,60
-Vehicle,suspendedMassAtWheels.RL,64.5
-Vehicle,suspendedMassAtWheels.RR,64.5
-Vehicle,suspendedMassHeight,0.33
+Vehicle,suspendedMassAtWheels.FL,61.5
+Vehicle,suspendedMassAtWheels.FR,64
+Vehicle,suspendedMassAtWheels.RL,67.5
+Vehicle,suspendedMassAtWheels.RR,68
+Vehicle,suspendedMassHeight,0.2894
+Vehicle,nonSuspendedMassHeight,0.195
 Vehicle,rollCenterHeightFront,0.0491
 Vehicle,rollCenterHeightBack,0.0539
 Vehicle,frontSpringMotionRatio,1
 Vehicle,frontArbMotionRatio,1
-Vehicle,frontKspring,1
-Vehicle,frontKarb,1
+Vehicle,frontKspring,70
+Vehicle,frontKarb,100
 Vehicle,rearSpringMotionRatio,1
 Vehicle,rearArbMotionRatio,1
-Vehicle,rearKspring,1
+Vehicle,rearKspring,70
 Vehicle,rearKarb,1
 Vehicle,frontTrackWidth,1.256
 Vehicle,rearTrackWidth,1.216
@@ -60,50 +61,50 @@ Tire,RCX1,-0.675188
 Tire,REX1,0.0221342
 Tire,REX2,0.13104
 Tire,RHX1,0.00116931
-Tire,PCY1,1.10458
-Tire,PDY1,2.1233
-Tire,PDY2,-0.314498
-Tire,PDY3,10.935
-Tire,PEY1,1.30665
-Tire,PEY2,1.6917
-Tire,PEY3,-0.710038
-Tire,PEY4,0.0168159
-Tire,PKY1,35.1628
-Tire,PKY2,2.28469
-Tire,PKY3,0.559829
-Tire,PHY1,0.0229526
-Tire,PHY2,0.035246
-Tire,PHY3,-0.107389
-Tire,PVY1,0.0561861
-Tire,PVY2,-0.0676672
-Tire,PVY3,0.601949
-Tire,PVY4,-0.00985716
+Tire,PCY1,    1.12025
+Tire,PDY1,    2.17116
+Tire,PDY2,    -0.6749
+Tire,PDY3,    9.6864
+Tire,PEY1,    1.01237
+Tire,PEY2,    1.45105
+Tire,PEY3,    -1.01715
+Tire,PEY4,    -3.76685
+Tire,PKY1,    32.4464
+Tire,PKY2,    1.9369
+Tire,PKY3,    0.603066
+Tire,PHY1,    0.0160889
+Tire,PHY2,    0.0259165
+Tire,PHY3,    -0.170641
+Tire,PVY1,    0.0515402
+Tire,PVY2,    -0.0355678
+Tire,PVY3,    1.01254
+Tire,PVY4,    -0.447043
+Tire,QBZ1,    -2.79277
+Tire,QBZ2,    -0.876655
+Tire,QBZ3,    1.29562
+Tire,QBZ5,    0.200041
+Tire,QBZ4,    0.281018
+Tire,QBZ9,    26.2564
+Tire,QBZ10,    0.177473
+Tire,QCZ1,    0.921146
+Tire,QDZ1,    0.905595
+Tire,QDZ2,    0.52887
+Tire,QDZ3,    -0.152378
+Tire,QDZ4,    2.31907
+Tire,QDZ6,    -0.0163036
+Tire,QDZ7,    -0.0218975
+Tire,QDZ8,    -2.69308
+Tire,QDZ9,    0.586642
+Tire,QEZ1,    -347.511
+Tire,QEZ2,    565.462
+Tire,QEZ3,    -106.574
+Tire,QEZ4,    0.113425
+Tire,QEZ5,    -35.6819
+Tire,QHZ1,    -0.00219638
+Tire,QHZ2,    -0.00202769
+Tire,QHZ3,    -0.0671321
+Tire,QHZ4,    -0.0195978
 Tire,FNOMIN,-3000
-Tire,QBZ1,-3.8128
-Tire,QBZ2,-0.510624
-Tire,QBZ3,2.16258
-Tire,QBZ5,0.303084
-Tire,QBZ4,0.32937
-Tire,QBZ9,-39.9478
-Tire,QBZ10,-0.270257
-Tire,QCZ1,0.984872
-Tire,QDZ1,0.367154
-Tire,QDZ2,-0.0575742
-Tire,QDZ3,0.456306
-Tire,QDZ4,-2.20731
-Tire,QDZ6,0.0180736
-Tire,QDZ7,0.0152598
-Tire,QDZ8,-1.59795
-Tire,QDZ9,0.967986
-Tire,QEZ1,-59.148
-Tire,QEZ2,30.968
-Tire,QEZ3,-90.7708
-Tire,QEZ4,-0.109211
-Tire,QEZ5,-3.378
-Tire,QHZ1,0.0125658
-Tire,QHZ2,0.0206398
-Tire,QHZ3,-0.0683138
-Tire,QHZ4,0.0324363
 Tire,R0,0.2032
 Tire,LFZ0,1
 Tire,LCX,1
@@ -137,21 +138,10 @@ Tire,LVMX,1
 Tire,LSGKP,1
 Tire,LSGAL,1
 Tire,LGYR,1
-Aero,frontalArea,1.0
-Aero,dragCoefficient,0.5
-Aero,liftCoefficientFront,-1.2
-Aero,liftCoefficientRear,-1.5
-SkidPad,radius,13.0
-SkidPad,minSpeed,5
-SkidPad,maxSpeed,20
-SkidPad,speedStep,1
-SkidPad,errDelta,0.001
-SkidPad,maxIterConv,10
-SkidPad,diameter,1.3
 Simlation,maxSlipAngle,10
-Simlation,maxSteeringAngle,25
+Simlation,maxSteeringAngle,24
 Simlation,slipAngleStep,1
 Simlation,steeringAngleStep,2
-Simlation,speed,11
+Simlation,speed,10
 Simlation,tolerance,0.01
 Simlation,maxIterations,100
