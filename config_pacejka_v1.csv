@@ -39,12 +39,52 @@ Vehicle,toeAngle.FR,0
 Vehicle,toeAngle.RL,0
 Vehicle,toeAngle.RR,0
 Tire,frame,SAE
-Tire,implementation,Simple
-Tire,scalingFac,0.75
-Tire,quadFac,-0.0002
-Tire,linFac,1.5
-Tire,radFac,0.85
-Simlation,maxSlipAngle,20
+Tire,implementation,PacejkaV1
+Tire,PCY1,    1.12025
+Tire,PDY1,    2.17116
+Tire,PDY2,    -0.6749
+Tire,PDY3,    9.6864
+Tire,PEY1,    1.01237
+Tire,PEY2,    1.45105
+Tire,PEY3,    -1.01715
+Tire,PEY4,    -3.76685
+Tire,PKY1,    32.4464
+Tire,PKY2,    1.9369
+Tire,PKY3,    0.603066
+Tire,PHY1,    0.0160889
+Tire,PHY2,    0.0259165
+Tire,PHY3,    -0.170641
+Tire,PVY1,    0.0515402
+Tire,PVY2,    -0.0355678
+Tire,PVY3,    1.01254
+Tire,PVY4,    -0.447043
+Tire,QBZ1,    -2.79277
+Tire,QBZ2,    -0.876655
+Tire,QBZ3,    1.29562
+Tire,QBZ5,    0.200041
+Tire,QBZ4,    0.281018
+Tire,QBZ9,    26.2564
+Tire,QBZ10,    0.177473
+Tire,QCZ1,    0.921146
+Tire,QDZ1,    0.905595
+Tire,QDZ2,    0.52887
+Tire,QDZ3,    -0.152378
+Tire,QDZ4,    2.31907
+Tire,QDZ6,    -0.0163036
+Tire,QDZ7,    -0.0218975
+Tire,QDZ8,    -2.69308
+Tire,QDZ9,    0.586642
+Tire,QEZ1,    -347.511
+Tire,QEZ2,    565.462
+Tire,QEZ3,    -106.574
+Tire,QEZ4,    0.113425
+Tire,QEZ5,    -35.6819
+Tire,QHZ1,    -0.00219638
+Tire,QHZ2,    -0.00202769
+Tire,QHZ3,    -0.0671321
+Tire,QHZ4,    -0.0195978
+Tire,FNOMIN,-3000
+Simlation,maxSlipAngle,10
 Simlation,maxSteeringAngle,13.10
 Simlation,slipAngleStep,1
 Simlation,steeringAngleStep,2
