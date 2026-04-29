@@ -65,6 +65,7 @@ class Vehicle {
     void setSteeringAngle(Alpha<Frame> steeringAngle);
     void setSpeed(float speed);
 
+    float lastLatAcc = 0;
     std::array<float, 2> calculateLatAccAndYawMoment(float tolerance, int maxIterations,
                                                const Config& config);
 };

@@ -93,33 +93,52 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     WheelData<Y<Frame>> tireForcesY;
     WheelData<Z<Frame>> tireMomentsZ;
     WheelData<Alpha<Frame>> slipAngles;
-    Y<Frame> latAcc{0};
-    float error;
-    int iterations = 0;
-
-    state.angularVelocity.setLength(0);
-
+    float speed = state.velocity.getLength();
     float earthAcc = config.get("Environment", "earthAcc");
-    auto loads = staticLoad(earthAcc);
-    do {
-        iterations++;
+
+    auto evaluate = [&](float testLatAcc) -> float {
+        state.angularVelocity.z = Z<Frame>{testLatAcc / speed};
         slipAngles = calculateSlipAngles();
-
+        auto testLoads = totalTireLoads(Y<Frame>{testLatAcc}, config);
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(loads[i], slipAngles[i], 0);
-
+            tires[i].value->calculate(testLoads[i], slipAngles[i], 0);
             tireForcesX[i] = tires[i].value->getForce().value.x;
             tireForcesY[i] = tires[i].value->getForce().value.y;
             tireMomentsZ[i] = tires[i].value->getTorque().z;
         }
+        return calculateLatAcc(tireForcesX, tireForcesY).v;
+    };
 
-        auto newLatAcc = calculateLatAcc(tireForcesX, tireForcesY);
-        error = std::abs(latAcc.v - newLatAcc.v);
-        latAcc = newLatAcc;
-        state.angularVelocity.z = Z<Frame>{latAcc.v / state.velocity.getLength()};
+    float maxAcc = combinedTotalMass.value * earthAcc;
+    float lo = lastLatAcc - 5.0f;
+    float hi = lastLatAcc + 5.0f;
+    float flo = evaluate(lo) - lo;
+    float fhi = evaluate(hi) - hi;
 
-        loads = totalTireLoads(latAcc, config);
-    } while (error > tolerance && iterations < maxIterations);
+    while ((flo > 0) == (fhi > 0)) {
+        lo = std::max(lo - 10.0f, -maxAcc);
+        hi = std::min(hi + 10.0f, maxAcc);
+        flo = evaluate(lo) - lo;
+        fhi = evaluate(hi) - hi;
+        if (lo <= -maxAcc && hi >= maxAcc) break;
+    }
+
+    for (int i = 0; i < maxIterations; i++) {
+        float mid = (lo + hi) * 0.5f;
+        float fmid = evaluate(mid) - mid;
+        if (std::abs(hi - lo) < tolerance) break;
+        if ((flo > 0) != (fmid > 0)) {
+            hi = mid;
+            fhi = fmid;
+        } else {
+            lo = mid;
+            flo = fmid;
+        }
+    }
+
+    Y<Frame> latAcc{(lo + hi) * 0.5f};
+    evaluate(latAcc.v);
+    lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {

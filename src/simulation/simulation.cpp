@@ -49,15 +49,26 @@ std::vector<std::array<float, 4>> Simulation::getYawMomentDiagramPoints(
     for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
         steeringAngle += steeringAngleStep) {
         v.setSteeringAngle(Alpha<Frame>(steeringAngle * M_PI / 180.f));
+        // Sweep from slip=0 outward in both directions to maintain branch continuity
+        std::vector<std::array<float, 4>> steeringPoints;
 
-        for (float chassisSlipAngle = -maxSlipAngle; chassisSlipAngle <= maxSlipAngle;
-            chassisSlipAngle += slipAngleStep) {
-            v.setChassisSlipAngle(Alpha<Frame>(chassisSlipAngle * M_PI / 180.f));
-
-            std::array<float, 2> diagramPoint =
-                v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
-            out.push_back({steeringAngle, chassisSlipAngle, diagramPoint[0], diagramPoint[1]});
+        v.lastLatAcc = 0;
+        for (float s = 0; s <= maxSlipAngle; s += slipAngleStep) {
+            v.setChassisSlipAngle(Alpha<Frame>(s * M_PI / 180.f));
+            auto dp = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
+            steeringPoints.push_back({steeringAngle, s, dp[0], dp[1]});
         }
+
+        v.lastLatAcc = 0;
+        for (float s = -slipAngleStep; s >= -maxSlipAngle; s -= slipAngleStep) {
+            v.setChassisSlipAngle(Alpha<Frame>(s * M_PI / 180.f));
+            auto dp = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
+            steeringPoints.push_back({steeringAngle, s, dp[0], dp[1]});
+        }
+
+        std::sort(steeringPoints.begin(), steeringPoints.end(),
+                  [](const auto& a, const auto& b) { return a[1] < b[1]; });
+        for (const auto& p : steeringPoints) out.push_back(p);
     }
     return out;
 }
