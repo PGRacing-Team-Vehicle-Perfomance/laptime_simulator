@@ -55,6 +55,8 @@ class Vehicle {
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<Y<Frame>> getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                            const WheelData<Y<Frame>>& tireFy);
+    X<Frame> calculateLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                              const WheelData<Y<Frame>>& tireForcesY);
 
    public:
     Vehicle(const Config& config,
