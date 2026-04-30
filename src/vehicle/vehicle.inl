@@ -281,8 +281,29 @@ WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc,
     auto transfer = loadTransfer(latAcc);
     WheelData<float> tireLoads;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tireLoads[i] = std::max(0.f, static_load[i] + aero[i] + transfer[i]);
+        tireLoads[i] = static_load[i] + aero[i] + transfer[i];
     }
+
+    // Per-axle LCP: at lift-off, inner=0 and outer takes full axle load
+    // (vertical conservation: F_in + F_out = S_axle + A_axle).
+    auto solveAxleLCP = [](float& left, float& right, float axleTotal) {
+        if (axleTotal <= 0) {
+            left = 0;
+            right = 0;
+        } else if (left < 0) {
+            left = 0;
+            right = axleTotal;
+        } else if (right < 0) {
+            right = 0;
+            left = axleTotal;
+        }
+    };
+
+    float frontTotal = static_load.FL + static_load.FR + aero.FL + aero.FR;
+    float rearTotal = static_load.RL + static_load.RR + aero.RL + aero.RR;
+    solveAxleLCP(tireLoads.FL, tireLoads.FR, frontTotal);
+    solveAxleLCP(tireLoads.RL, tireLoads.RR, rearTotal);
+
     return tireLoads;
 }
 
