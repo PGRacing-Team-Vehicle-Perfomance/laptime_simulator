@@ -40,6 +40,11 @@ class Vehicle {
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
+    // Drive/brake model
+    float brakeBiasFront;
+    float driveBiasFront;  // 0 = RWD, 1 = FWD, 0..1 = AWD
+    WheelData<float> distributeKappa(float demand);
+
     WheelData<Alpha<Frame>> calculateSlipAngles();
     WheelData<float> staticLoad(float earthAcc);
     Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,

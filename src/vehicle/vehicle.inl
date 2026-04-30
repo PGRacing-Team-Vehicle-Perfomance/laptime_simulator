@@ -25,6 +25,9 @@ Vehicle<Frame>::Vehicle(const Config& config,
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       tires(std::move(tires)) {
+    brakeBiasFront = config.get("Vehicle", "brakeBiasFront", 0.6f);
+    driveBiasFront = config.get("Vehicle", "driveBiasFront", 0.0f);
+
     aero.value = {config};
     aero.position = config.getVec<Frame>("Vehicle", "claPosition");
 
@@ -87,6 +90,14 @@ Vehicle<Frame>::Vehicle(const Config& config,
 }
 
 template <typename Frame>
+WheelData<float> Vehicle<Frame>::distributeKappa(float demand) {
+    // Kept for interface but no longer used in solver
+    WheelData<float> kappa;
+    kappa.FL = kappa.FR = kappa.RL = kappa.RR = 0;
+    return kappa;
+}
+
+template <typename Frame>
 std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float tolerance, int maxIterations, const Config& config) {
     WheelData<X<Frame>> tireForcesX;
@@ -96,13 +107,55 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float speed = state.velocity.getLength();
     float earthAcc = config.get("Environment", "earthAcc");
 
-    // Evaluate: given latAcc and kappa, compute tire forces and return computed latAcc
-    auto evaluate = [&](float testLatAcc, float kappa) -> float {
+    // Find kappa for a single wheel such that its Fx matches targetFx
+    auto solveKappaForWheel = [&](size_t i, float load, Alpha<Frame> slip, float targetFx) -> float {
+        if (load < 1.0f) return 0;
+        float kLo = -0.3f, kHi = 0.3f;
+        auto fxAt = [&](float k) -> float {
+            tires[i].value->calculate(load, slip, k);
+            return tires[i].value->getForce().value.x.v;
+        };
+        float fLo = fxAt(kLo) - targetFx;
+        float fHi = fxAt(kHi) - targetFx;
+        if ((fLo > 0) == (fHi > 0)) return 0;
+        for (int j = 0; j < 30; j++) {
+            float kMid = (kLo + kHi) * 0.5f;
+            float fMid = fxAt(kMid) - targetFx;
+            if (std::abs(fMid) < 0.5f) break;
+            if ((fLo > 0) != (fMid > 0)) { kHi = kMid; fHi = fMid; }
+            else { kLo = kMid; fLo = fMid; }
+        }
+        return (kLo + kHi) * 0.5f;
+    };
+
+    // Evaluate: given latAcc and force demand [N], compute tire forces with open diff
+    // forceDemand > 0 = drive, < 0 = brake
+    // Open diff: equal Fx target per wheel within each axle
+    auto evaluate = [&](float testLatAcc, float forceDemand) -> float {
         state.angularVelocity.z = Z<Frame>{testLatAcc / speed};
         slipAngles = calculateSlipAngles();
         auto testLoads = totalTireLoads(Y<Frame>{testLatAcc}, config);
+
+        WheelData<float> targetFx;
+        if (forceDemand >= 0) {
+            float fAxle = forceDemand * driveBiasFront / 2;
+            float rAxle = forceDemand * (1 - driveBiasFront) / 2;
+            targetFx.FL = fAxle;  targetFx.FR = fAxle;
+            targetFx.RL = rAxle;  targetFx.RR = rAxle;
+        } else {
+            float fAxle = forceDemand * brakeBiasFront / 2;
+            float rAxle = forceDemand * (1 - brakeBiasFront) / 2;
+            targetFx.FL = fAxle;  targetFx.FR = fAxle;
+            targetFx.RL = rAxle;  targetFx.RR = rAxle;
+        }
+
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(testLoads[i], slipAngles[i], kappa);
+            if (std::abs(targetFx[i]) < 0.5f) {
+                tires[i].value->calculate(testLoads[i], slipAngles[i], 0);
+            } else {
+                float kappa = solveKappaForWheel(i, testLoads[i], slipAngles[i], targetFx[i]);
+                tires[i].value->calculate(testLoads[i], slipAngles[i], kappa);
+            }
             tireForcesX[i] = tires[i].value->getForce().value.x;
             tireForcesY[i] = tires[i].value->getForce().value.y;
             tireMomentsZ[i] = tires[i].value->getTorque().z;
@@ -110,25 +163,25 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         return calculateLatAcc(tireForcesX, tireForcesY).v;
     };
 
-    // Inner bisection: find latAcc equilibrium for a given kappa
+    // Inner bisection: find latAcc equilibrium for a given force demand
     float maxAcc = combinedTotalMass.value * earthAcc;
-    auto solveLatAcc = [&](float kappa) -> float {
+    auto solveLatAcc = [&](float forceDemand) -> float {
         float lo = lastLatAcc - 5.0f;
         float hi = lastLatAcc + 5.0f;
-        float flo = evaluate(lo, kappa) - lo;
-        float fhi = evaluate(hi, kappa) - hi;
+        float flo = evaluate(lo, forceDemand) - lo;
+        float fhi = evaluate(hi, forceDemand) - hi;
 
         while ((flo > 0) == (fhi > 0)) {
             lo = std::max(lo - 10.0f, -maxAcc);
             hi = std::min(hi + 10.0f, maxAcc);
-            flo = evaluate(lo, kappa) - lo;
-            fhi = evaluate(hi, kappa) - hi;
+            flo = evaluate(lo, forceDemand) - lo;
+            fhi = evaluate(hi, forceDemand) - hi;
             if (lo <= -maxAcc && hi >= maxAcc) break;
         }
 
         for (int i = 0; i < maxIterations; i++) {
             float mid = (lo + hi) * 0.5f;
-            float fmid = evaluate(mid, kappa) - mid;
+            float fmid = evaluate(mid, forceDemand) - mid;
             if (std::abs(hi - lo) < tolerance) break;
             if ((flo > 0) != (fmid > 0)) {
                 hi = mid; fhi = fmid;
@@ -139,34 +192,35 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         return (lo + hi) * 0.5f;
     };
 
-    // Outer bisection: find kappa such that longitudinal acceleration = 0
-    float kappaLo = -0.3f, kappaHi = 0.3f;
+    // Outer bisection: find force demand [N] such that longitudinal acceleration = 0
+    float maxForce = combinedTotalMass.value * earthAcc * 2;
+    float demandLo = -maxForce, demandHi = maxForce;
 
-    auto longAccAtKappa = [&](float kappa) -> float {
-        float la = solveLatAcc(kappa);
-        evaluate(la, kappa);
+    auto longAccAtDemand = [&](float fd) -> float {
+        float la = solveLatAcc(fd);
+        evaluate(la, fd);
         return calculateLongAcc(tireForcesX, tireForcesY).v;
     };
 
-    float flk = longAccAtKappa(kappaLo);
-    float fhk = longAccAtKappa(kappaHi);
+    float flk = longAccAtDemand(demandLo);
+    float fhk = longAccAtDemand(demandHi);
 
     if ((flk > 0) != (fhk > 0)) {
         for (int i = 0; i < maxIterations; i++) {
-            float midK = (kappaLo + kappaHi) * 0.5f;
-            float fmk = longAccAtKappa(midK);
-            if (std::abs(kappaHi - kappaLo) < tolerance * 0.01f) break;
+            float midD = (demandLo + demandHi) * 0.5f;
+            float fmk = longAccAtDemand(midD);
+            if (std::abs(fmk) < tolerance * 0.1f) break;
             if ((flk > 0) != (fmk > 0)) {
-                kappaHi = midK; fhk = fmk;
+                demandHi = midD; fhk = fmk;
             } else {
-                kappaLo = midK; flk = fmk;
+                demandLo = midD; flk = fmk;
             }
         }
     }
 
-    float kappa = (kappaLo + kappaHi) * 0.5f;
-    Y<Frame> latAcc{solveLatAcc(kappa)};
-    evaluate(latAcc.v, kappa);
+    float fd = (demandLo + demandHi) * 0.5f;
+    Y<Frame> latAcc{solveLatAcc(fd)};
+    evaluate(latAcc.v, fd);
     lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
