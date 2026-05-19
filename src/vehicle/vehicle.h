@@ -40,13 +40,10 @@ class Vehicle {
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
-    // Drive/brake model
     float brakeBiasFront;
-    float driveBiasFront;  // 0 = RWD, 1 = FWD, 0..1 = AWD
+    float driveBiasFront;
     WheelData<float> distributeKappa(float demand);
 
-    // Longitudinal equilibrium: when disabled, fd=0 (no Fx injected, pre-PR3 behavior).
-    // When enabled, solver finds fd such that longitudinal acceleration == targetLongAcc.
     bool longEquilibriumEnabled;
     float targetLongAcc;
 

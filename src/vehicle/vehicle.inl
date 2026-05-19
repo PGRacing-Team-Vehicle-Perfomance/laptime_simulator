@@ -93,7 +93,6 @@ Vehicle<Frame>::Vehicle(const Config& config,
 
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::distributeKappa(float demand) {
-    // Kept for interface but no longer used in solver
     WheelData<float> kappa;
     kappa.FL = kappa.FR = kappa.RL = kappa.RR = 0;
     return kappa;
@@ -109,22 +108,21 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float speed = state.velocity.getLength();
     float earthAcc = config.get("Environment", "earthAcc");
 
-    // Find kappa for a single wheel such that its Fx matches targetFx
     auto solveKappaForWheel = [&](size_t i, float load, Alpha<Frame> slip, float targetFx) -> float {
         if (load < 1.0f) return 0;
-        float kLo = -0.3f, kHi = 0.3f;
-        auto fxAt = [&](float k) -> float {
-            tires[i].value->calculate(load, slip, k);
+        float lowerKappa = -0.3f, upperKappa = 0.3f;
+        auto forceAt = [&](float kappa) -> float {
+            tires[i].value->calculate(load, slip, kappa);
             return tires[i].value->getForce().value.x.v;
         };
-        float fLo = fxAt(kLo) - targetFx;
-        float fHi = fxAt(kHi) - targetFx;
-        if ((fLo > 0) == (fHi > 0)) {
+        float lowerError = forceAt(lowerKappa) - targetFx;
+        float upperError = forceAt(upperKappa) - targetFx;
+        if ((lowerError > 0) == (upperError > 0)) {
             float saturatedKappa = 0;
-            float saturatedFx = fxAt(0);
+            float saturatedFx = forceAt(0);
             for (int step = -20; step <= 20; step++) {
                 float candidateKappa = 0.015f * step;
-                float candidateFx = fxAt(candidateKappa);
+                float candidateFx = forceAt(candidateKappa);
                 if ((targetFx > 0 && candidateFx > saturatedFx) ||
                     (targetFx < 0 && candidateFx < saturatedFx)) {
                     saturatedFx = candidateFx;
@@ -133,19 +131,21 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
             }
             return saturatedKappa;
         }
-        for (int j = 0; j < 30; j++) {
-            float kMid = (kLo + kHi) * 0.5f;
-            float fMid = fxAt(kMid) - targetFx;
-            if (std::abs(fMid) < 0.5f) break;
-            if ((fLo > 0) != (fMid > 0)) { kHi = kMid; fHi = fMid; }
-            else { kLo = kMid; fLo = fMid; }
+        for (int iter = 0; iter < 30; iter++) {
+            float midKappa = (lowerKappa + upperKappa) * 0.5f;
+            float midError = forceAt(midKappa) - targetFx;
+            if (std::abs(midError) < 0.5f) break;
+            if ((lowerError > 0) != (midError > 0)) {
+                upperKappa = midKappa;
+                upperError = midError;
+            } else {
+                lowerKappa = midKappa;
+                lowerError = midError;
+            }
         }
-        return (kLo + kHi) * 0.5f;
+        return (lowerKappa + upperKappa) * 0.5f;
     };
 
-    // Evaluate: given latAcc and force demand [N], compute tire forces with open diff
-    // forceDemand > 0 = drive, < 0 = brake
-    // Open diff: equal Fx target per wheel within each axle
     auto evaluate = [&](float testLatAcc, float forceDemand) -> float {
         state.angularVelocity.z = Z<Frame>{testLatAcc / speed};
         slipAngles = calculateSlipAngles();
@@ -153,15 +153,15 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
 
         WheelData<float> targetFx;
         if (forceDemand >= 0) {
-            float fAxle = forceDemand * driveBiasFront / 2;
-            float rAxle = forceDemand * (1 - driveBiasFront) / 2;
-            targetFx.FL = fAxle;  targetFx.FR = fAxle;
-            targetFx.RL = rAxle;  targetFx.RR = rAxle;
+            float frontAxleFx = forceDemand * driveBiasFront / 2;
+            float rearAxleFx = forceDemand * (1 - driveBiasFront) / 2;
+            targetFx.FL = frontAxleFx;  targetFx.FR = frontAxleFx;
+            targetFx.RL = rearAxleFx;   targetFx.RR = rearAxleFx;
         } else {
-            float fAxle = forceDemand * brakeBiasFront / 2;
-            float rAxle = forceDemand * (1 - brakeBiasFront) / 2;
-            targetFx.FL = fAxle;  targetFx.FR = fAxle;
-            targetFx.RL = rAxle;  targetFx.RR = rAxle;
+            float frontAxleFx = forceDemand * brakeBiasFront / 2;
+            float rearAxleFx = forceDemand * (1 - brakeBiasFront) / 2;
+            targetFx.FL = frontAxleFx;  targetFx.FR = frontAxleFx;
+            targetFx.RL = rearAxleFx;   targetFx.RR = rearAxleFx;
         }
 
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
@@ -178,68 +178,70 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         return calculateLatAcc(tireForcesX, tireForcesY).v;
     };
 
-    // Inner bisection: find latAcc equilibrium for a given force demand
-    float maxAcc = combinedTotalMass.value * earthAcc;
+    float maxLatAcc = combinedTotalMass.value * earthAcc;
     auto solveLatAcc = [&](float forceDemand) -> float {
-        float lo = lastLatAcc - 5.0f;
-        float hi = lastLatAcc + 5.0f;
-        float flo = evaluate(lo, forceDemand) - lo;
-        float fhi = evaluate(hi, forceDemand) - hi;
+        float lowerLatAcc = lastLatAcc - 5.0f;
+        float upperLatAcc = lastLatAcc + 5.0f;
+        float lowerError = evaluate(lowerLatAcc, forceDemand) - lowerLatAcc;
+        float upperError = evaluate(upperLatAcc, forceDemand) - upperLatAcc;
 
-        while ((flo > 0) == (fhi > 0)) {
-            lo = std::max(lo - 10.0f, -maxAcc);
-            hi = std::min(hi + 10.0f, maxAcc);
-            flo = evaluate(lo, forceDemand) - lo;
-            fhi = evaluate(hi, forceDemand) - hi;
-            if (lo <= -maxAcc && hi >= maxAcc) break;
+        while ((lowerError > 0) == (upperError > 0)) {
+            lowerLatAcc = std::max(lowerLatAcc - 10.0f, -maxLatAcc);
+            upperLatAcc = std::min(upperLatAcc + 10.0f, maxLatAcc);
+            lowerError = evaluate(lowerLatAcc, forceDemand) - lowerLatAcc;
+            upperError = evaluate(upperLatAcc, forceDemand) - upperLatAcc;
+            if (lowerLatAcc <= -maxLatAcc && upperLatAcc >= maxLatAcc) break;
         }
 
-        for (int i = 0; i < maxIterations; i++) {
-            float mid = (lo + hi) * 0.5f;
-            float fmid = evaluate(mid, forceDemand) - mid;
-            if (std::abs(hi - lo) < tolerance) break;
-            if ((flo > 0) != (fmid > 0)) {
-                hi = mid; fhi = fmid;
+        for (int iter = 0; iter < maxIterations; iter++) {
+            float midLatAcc = (lowerLatAcc + upperLatAcc) * 0.5f;
+            float midError = evaluate(midLatAcc, forceDemand) - midLatAcc;
+            if (std::abs(upperLatAcc - lowerLatAcc) < tolerance) break;
+            if ((lowerError > 0) != (midError > 0)) {
+                upperLatAcc = midLatAcc;
+                upperError = midError;
             } else {
-                lo = mid; flo = fmid;
+                lowerLatAcc = midLatAcc;
+                lowerError = midError;
             }
         }
-        return (lo + hi) * 0.5f;
+        return (lowerLatAcc + upperLatAcc) * 0.5f;
     };
 
-    // Outer bisection: find force demand [N] s.t. long acceleration == targetLongAcc.
-    // Disabled -> fd=0 (no Fx injected, pre-PR3 behavior).
-    float fd = 0;
+    float forceDemand = 0;
     if (longEquilibriumEnabled) {
         float maxForce = combinedTotalMass.value * earthAcc * 2;
-        float demandLo = -maxForce, demandHi = maxForce;
+        float lowerDemand = -maxForce;
+        float upperDemand = maxForce;
 
         auto longAccError = [&](float demand) -> float {
-            float la = solveLatAcc(demand);
-            evaluate(la, demand);
+            float resultingLatAcc = solveLatAcc(demand);
+            evaluate(resultingLatAcc, demand);
             return calculateLongAcc(tireForcesX, tireForcesY).v - targetLongAcc;
         };
 
-        float flk = longAccError(demandLo);
-        float fhk = longAccError(demandHi);
+        float lowerError = longAccError(lowerDemand);
+        float upperError = longAccError(upperDemand);
 
-        if ((flk > 0) != (fhk > 0)) {
-            for (int i = 0; i < maxIterations; i++) {
-                float midD = (demandLo + demandHi) * 0.5f;
-                float fmk = longAccError(midD);
-                if (std::abs(fmk) < tolerance * 0.1f) break;
-                if ((flk > 0) != (fmk > 0)) {
-                    demandHi = midD; fhk = fmk;
+        if ((lowerError > 0) != (upperError > 0)) {
+            for (int iter = 0; iter < maxIterations; iter++) {
+                float midDemand = (lowerDemand + upperDemand) * 0.5f;
+                float midError = longAccError(midDemand);
+                if (std::abs(midError) < tolerance * 0.1f) break;
+                if ((lowerError > 0) != (midError > 0)) {
+                    upperDemand = midDemand;
+                    upperError = midError;
                 } else {
-                    demandLo = midD; flk = fmk;
+                    lowerDemand = midDemand;
+                    lowerError = midError;
                 }
             }
         }
 
-        fd = (demandLo + demandHi) * 0.5f;
+        forceDemand = (lowerDemand + upperDemand) * 0.5f;
     }
-    Y<Frame> latAcc{solveLatAcc(fd)};
-    evaluate(latAcc.v, fd);
+    Y<Frame> latAcc{solveLatAcc(forceDemand)};
+    evaluate(latAcc.v, forceDemand);
     lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
