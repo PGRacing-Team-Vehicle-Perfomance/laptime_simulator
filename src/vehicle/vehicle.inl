@@ -245,6 +245,13 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     evaluate(latAcc.v, forceDemand);
     lastLatAcc = latAcc.v;
 
+    if (longEquilibriumEnabled) {
+        float achievedLongAcc = calculateLongAcc(tireForcesX, tireForcesY).v;
+        if (std::abs(achievedLongAcc - targetLongAcc) > tolerance) {
+            return {std::nanf(""), std::nanf("")};
+        }
+    }
+
     float yawMomentFromTires = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         yawMomentFromTires += tireMomentsZ[i].v;
