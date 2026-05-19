@@ -92,10 +92,10 @@ Vehicle<Frame>::Vehicle(const Config& config,
 }
 
 template <typename Frame>
-WheelData<float> Vehicle<Frame>::distributeKappa(float demand) {
-    WheelData<float> kappa;
-    kappa.FL = kappa.FR = kappa.RL = kappa.RR = 0;
-    return kappa;
+WheelData<float> Vehicle<Frame>::distributeSlipRatio(float demand) {
+    WheelData<float> slipRatio;
+    slipRatio.FL = slipRatio.FR = slipRatio.RL = slipRatio.RR = 0;
+    return slipRatio;
 }
 
 template <typename Frame>
@@ -108,42 +108,43 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float speed = state.velocity.getLength();
     float earthAcc = config.get("Environment", "earthAcc");
 
-    auto solveKappaForWheel = [&](size_t i, float load, Alpha<Frame> slip, float targetFx) -> float {
+    auto solveSlipRatioForWheel = [&](size_t i, float load, Alpha<Frame> slip, float targetFx) -> float {
         if (load < 1.0f) return 0;
-        float lowerKappa = -0.3f, upperKappa = 0.3f;
-        auto forceAt = [&](float kappa) -> float {
-            tires[i].value->calculate(load, slip, kappa);
+        float lowerSlipRatio = -0.3f, upperSlipRatio = 0.3f;
+        auto forceAt = [&](float slipRatio) -> float {
+            tires[i].value->calculate(load, slip, slipRatio);
             return tires[i].value->getForce().value.x.v;
         };
-        float lowerError = forceAt(lowerKappa) - targetFx;
-        float upperError = forceAt(upperKappa) - targetFx;
+        float lowerError = forceAt(lowerSlipRatio) - targetFx;
+        float upperError = forceAt(upperSlipRatio) - targetFx;
         if ((lowerError > 0) == (upperError > 0)) {
-            float saturatedKappa = 0;
+            // demand exceeds tire peak Fx - pick slip ratio at peak |Fx| as best effort
+            float saturatedSlipRatio = 0;
             float saturatedFx = forceAt(0);
             for (int step = -20; step <= 20; step++) {
-                float candidateKappa = 0.015f * step;
-                float candidateFx = forceAt(candidateKappa);
+                float candidateSlipRatio = 0.015f * step;
+                float candidateFx = forceAt(candidateSlipRatio);
                 if ((targetFx > 0 && candidateFx > saturatedFx) ||
                     (targetFx < 0 && candidateFx < saturatedFx)) {
                     saturatedFx = candidateFx;
-                    saturatedKappa = candidateKappa;
+                    saturatedSlipRatio = candidateSlipRatio;
                 }
             }
-            return saturatedKappa;
+            return saturatedSlipRatio;
         }
         for (int iter = 0; iter < 30; iter++) {
-            float midKappa = (lowerKappa + upperKappa) * 0.5f;
-            float midError = forceAt(midKappa) - targetFx;
+            float midSlipRatio = (lowerSlipRatio + upperSlipRatio) * 0.5f;
+            float midError = forceAt(midSlipRatio) - targetFx;
             if (std::abs(midError) < 0.5f) break;
             if ((lowerError > 0) != (midError > 0)) {
-                upperKappa = midKappa;
+                upperSlipRatio = midSlipRatio;
                 upperError = midError;
             } else {
-                lowerKappa = midKappa;
+                lowerSlipRatio = midSlipRatio;
                 lowerError = midError;
             }
         }
-        return (lowerKappa + upperKappa) * 0.5f;
+        return (lowerSlipRatio + upperSlipRatio) * 0.5f;
     };
 
     auto evaluate = [&](float testLatAcc, float forceDemand) -> float {
@@ -168,8 +169,8 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
             if (std::abs(targetFx[i]) < 0.5f) {
                 tires[i].value->calculate(testLoads[i], slipAngles[i], 0);
             } else {
-                float kappa = solveKappaForWheel(i, testLoads[i], slipAngles[i], targetFx[i]);
-                tires[i].value->calculate(testLoads[i], slipAngles[i], kappa);
+                float slipRatio = solveSlipRatioForWheel(i, testLoads[i], slipAngles[i], targetFx[i]);
+                tires[i].value->calculate(testLoads[i], slipAngles[i], slipRatio);
             }
             tireForcesX[i] = tires[i].value->getForce().value.x;
             tireForcesY[i] = tires[i].value->getForce().value.y;

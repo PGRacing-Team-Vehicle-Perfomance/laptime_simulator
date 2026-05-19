@@ -42,7 +42,7 @@ class Vehicle {
 
     float brakeBiasFront;
     float driveBiasFront;
-    WheelData<float> distributeKappa(float demand);
+    WheelData<float> distributeSlipRatio(float demand);
 
     bool longEquilibriumEnabled;
     float targetLongAcc;
