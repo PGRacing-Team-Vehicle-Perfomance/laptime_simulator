@@ -119,7 +119,20 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         };
         float fLo = fxAt(kLo) - targetFx;
         float fHi = fxAt(kHi) - targetFx;
-        if ((fLo > 0) == (fHi > 0)) return 0;
+        if ((fLo > 0) == (fHi > 0)) {
+            float saturatedKappa = 0;
+            float saturatedFx = fxAt(0);
+            for (int step = -20; step <= 20; step++) {
+                float candidateKappa = 0.015f * step;
+                float candidateFx = fxAt(candidateKappa);
+                if ((targetFx > 0 && candidateFx > saturatedFx) ||
+                    (targetFx < 0 && candidateFx < saturatedFx)) {
+                    saturatedFx = candidateFx;
+                    saturatedKappa = candidateKappa;
+                }
+            }
+            return saturatedKappa;
+        }
         for (int j = 0; j < 30; j++) {
             float kMid = (kLo + kHi) * 0.5f;
             float fMid = fxAt(kMid) - targetFx;
