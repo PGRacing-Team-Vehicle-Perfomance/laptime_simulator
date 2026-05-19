@@ -45,6 +45,11 @@ class Vehicle {
     float driveBiasFront;  // 0 = RWD, 1 = FWD, 0..1 = AWD
     WheelData<float> distributeKappa(float demand);
 
+    // Longitudinal equilibrium: when disabled, fd=0 (no Fx injected, pre-PR3 behavior).
+    // When enabled, solver finds fd such that longitudinal acceleration == targetLongAcc.
+    bool longEquilibriumEnabled;
+    float targetLongAcc;
+
     WheelData<Alpha<Frame>> calculateSlipAngles();
     WheelData<float> staticLoad(float earthAcc);
     Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,

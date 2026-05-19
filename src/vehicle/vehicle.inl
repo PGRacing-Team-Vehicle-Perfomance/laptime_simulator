@@ -27,6 +27,8 @@ Vehicle<Frame>::Vehicle(const Config& config,
       tires(std::move(tires)) {
     brakeBiasFront = config.get("Vehicle", "brakeBiasFront", 0.6f);
     driveBiasFront = config.get("Vehicle", "driveBiasFront", 0.0f);
+    longEquilibriumEnabled = config.get("Simlation", "longEquilibrium", 1.0f) > 0.5f;
+    targetLongAcc = config.get("Simlation", "targetLongAcc", 0.0f);
 
     aero.value = {config};
     aero.position = config.getVec<Frame>("Vehicle", "claPosition");
@@ -192,33 +194,37 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         return (lo + hi) * 0.5f;
     };
 
-    // Outer bisection: find force demand [N] such that longitudinal acceleration = 0
-    float maxForce = combinedTotalMass.value * earthAcc * 2;
-    float demandLo = -maxForce, demandHi = maxForce;
+    // Outer bisection: find force demand [N] s.t. long acceleration == targetLongAcc.
+    // Disabled -> fd=0 (no Fx injected, pre-PR3 behavior).
+    float fd = 0;
+    if (longEquilibriumEnabled) {
+        float maxForce = combinedTotalMass.value * earthAcc * 2;
+        float demandLo = -maxForce, demandHi = maxForce;
 
-    auto longAccAtDemand = [&](float fd) -> float {
-        float la = solveLatAcc(fd);
-        evaluate(la, fd);
-        return calculateLongAcc(tireForcesX, tireForcesY).v;
-    };
+        auto longAccError = [&](float demand) -> float {
+            float la = solveLatAcc(demand);
+            evaluate(la, demand);
+            return calculateLongAcc(tireForcesX, tireForcesY).v - targetLongAcc;
+        };
 
-    float flk = longAccAtDemand(demandLo);
-    float fhk = longAccAtDemand(demandHi);
+        float flk = longAccError(demandLo);
+        float fhk = longAccError(demandHi);
 
-    if ((flk > 0) != (fhk > 0)) {
-        for (int i = 0; i < maxIterations; i++) {
-            float midD = (demandLo + demandHi) * 0.5f;
-            float fmk = longAccAtDemand(midD);
-            if (std::abs(fmk) < tolerance * 0.1f) break;
-            if ((flk > 0) != (fmk > 0)) {
-                demandHi = midD; fhk = fmk;
-            } else {
-                demandLo = midD; flk = fmk;
+        if ((flk > 0) != (fhk > 0)) {
+            for (int i = 0; i < maxIterations; i++) {
+                float midD = (demandLo + demandHi) * 0.5f;
+                float fmk = longAccError(midD);
+                if (std::abs(fmk) < tolerance * 0.1f) break;
+                if ((flk > 0) != (fmk > 0)) {
+                    demandHi = midD; fhk = fmk;
+                } else {
+                    demandLo = midD; flk = fmk;
+                }
             }
         }
-    }
 
-    float fd = (demandLo + demandHi) * 0.5f;
+        fd = (demandLo + demandHi) * 0.5f;
+    }
     Y<Frame> latAcc{solveLatAcc(fd)};
     evaluate(latAcc.v, fd);
     lastLatAcc = latAcc.v;
