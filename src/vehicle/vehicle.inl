@@ -284,8 +284,6 @@ WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc,
         tireLoads[i] = static_load[i] + aero[i] + transfer[i];
     }
 
-    // Per-axle LCP: at lift-off, inner=0 and outer takes full axle load
-    // (vertical conservation: F_in + F_out = S_axle + A_axle).
     auto solveAxleLCP = [](float& left, float& right, float axleTotal) {
         if (axleTotal <= 0) {
             left = 0;
