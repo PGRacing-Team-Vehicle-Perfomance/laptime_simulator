@@ -33,6 +33,7 @@ Vehicle<Frame>::Vehicle(const Config& config,
     combinedSuspendedMass = {0, {0, 0, 0}};
 
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        toeAngle[i].v = mirrorBySide(toeAngle[i].v, WHEEL_SIDE[i]);
         combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
         combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
