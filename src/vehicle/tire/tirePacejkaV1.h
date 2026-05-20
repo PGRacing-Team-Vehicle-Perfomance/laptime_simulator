@@ -13,7 +13,8 @@ class TirePacejkaV1 : public Tire<Internal, External> {
     Side sideRelativeToVehicle;
 
     std::unordered_map<std::string, float> tp;
-    void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) override;
+    void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio,
+                           Gamma<Internal> camber) override;
    public:
     TirePacejkaV1() = default;
     TirePacejkaV1(const Config& config, bool isDriven, Side sideRelativeToVehicle);

@@ -38,6 +38,10 @@ Vehicle,toeAngle.FL,0
 Vehicle,toeAngle.FR,0
 Vehicle,toeAngle.RL,0
 Vehicle,toeAngle.RR,0
+Vehicle,camber.FL,0
+Vehicle,camber.FR,0
+Vehicle,camber.RL,0
+Vehicle,camber.RR,0
 Tire,frame,SAE
 Tire,implementation,PacejkaV2
 Tire,PCX1,1.46408

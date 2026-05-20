@@ -22,6 +22,7 @@ Vehicle<Frame>::Vehicle(const Config& config,
       rearTrackWidth(config.get("Vehicle", "rearTrackWidth")),
       trackDistance(config.get("Vehicle", "trackDistance")),
       toeAngle(config.getAlphaWheelData<Frame>("Vehicle", "toeAngle")),
+      camber(config.getGammaWheelData<Frame>("Vehicle", "camber")),
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       tires(std::move(tires)) {
@@ -101,7 +102,7 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
         slipAngles = calculateSlipAngles();
         auto testLoads = totalTireLoads(Y<Frame>{testLatAcc}, config);
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(testLoads[i], slipAngles[i], 0);
+            tires[i].value->calculate(testLoads[i], slipAngles[i], 0, camber[i]);
             tireForcesX[i] = tires[i].value->getForce().value.x;
             tireForcesY[i] = tires[i].value->getForce().value.y;
             tireMomentsZ[i] = tires[i].value->getTorque().z;

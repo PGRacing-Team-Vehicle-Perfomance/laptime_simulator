@@ -10,7 +10,8 @@ class TireSimple : public Tire<Internal, External> {
     float linFac;
 
     float calculateForce(float verticalLoad, bool isLateral);
-    void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) override;
+    void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio,
+                           Gamma<Internal> camber) override;
    public:
     TireSimple() = default;
     TireSimple(const Config& config, bool isDriven);
