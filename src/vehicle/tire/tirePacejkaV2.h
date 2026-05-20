@@ -6,12 +6,6 @@
 #include <unordered_map>
 #include <string>
 
-// Assuming Side is already defined in tirePacejka.h, but just in case:
-#ifndef SIDE_ENUM_DEFINED
-#define SIDE_ENUM_DEFINED
-enum Side { Left, Right };
-#endif
-
 template <typename Internal, typename External>
 class TirePacejkaV2 : public Tire<Internal, External> {
     Side sideRelativeToVehicle;

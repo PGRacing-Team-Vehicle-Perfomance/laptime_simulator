@@ -106,8 +106,8 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
     // ================= FINAL RESULTS =================
     float Mz = -t * Fy + Mzr;
 
-    float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
-    float MzSAE = sideRelativeToVehicle == Left ? -Mz : Mz;
+    float FySAE = mirrorBySide(Fy, sideRelativeToVehicle);
+    float MzSAE = mirrorBySide(Mz, sideRelativeToVehicle);
     this->internalTorque = Torque<Internal>(0, 0, MzSAE);
     this->internalForce = Force<Internal>(Vec<Internal>(Fx, FySAE, 0), Vec<Internal>(0, 0, 0));
 }
@@ -121,8 +121,8 @@ void TirePacejkaV2<Internal, External>::calculateInternal(float verticalLoad, Al
         return;
     }
     float Fz = -verticalLoad;
-    float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
-    float gamma = sideRelativeToVehicle == Left ? -camber.v : camber.v;
+    float alpha = mirrorBySide(slipAngle.v, sideRelativeToVehicle);
+    float gamma = mirrorBySide(camber.v, sideRelativeToVehicle);
     float kappa = slipRatio;
 
     MF2002(Fz, alpha, gamma, kappa);
