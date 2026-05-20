@@ -335,8 +335,9 @@ WheelData<float> Vehicle<Frame>::aeroLoad(const Config& config) {
     Vec<Frame> wind = config.getVec<Frame>("Environment", "wind");
 
     aero.value.calculate(state, airDensityVal, wind);
-    // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
-    return distributeForces(-aero.value.getForce().value.z.v, aero.position.x.v, aero.position.y.v);
+    Transform<Frame, ISO8855> toIso;
+    float downforce = -toIso(aero.value.getForce().value.z).v;
+    return distributeForces(downforce, aero.position.x.v, aero.position.y.v);
 }
 
 template <typename Frame>
