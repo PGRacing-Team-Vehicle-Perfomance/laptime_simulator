@@ -115,6 +115,16 @@ public:
     }
 
     template <typename Frame>
+    WheelData<Gamma<Frame>> getGammaWheelData(const std::string& module, const std::string& prefix) const {
+        WheelData<Gamma<Frame>> wd;
+        wd.FL = Gamma<Frame>(get(module, prefix + ".FL"));
+        wd.FR = Gamma<Frame>(get(module, prefix + ".FR"));
+        wd.RL = Gamma<Frame>(get(module, prefix + ".RL"));
+        wd.RR = Gamma<Frame>(get(module, prefix + ".RR"));
+        return wd;
+    }
+
+    template <typename Frame>
     Vec<Frame> getVec(const std::string& module, const std::string& prefix) const {
         return Vec<Frame>(get(module, prefix + ".x"), get(module, prefix + ".y"), get(module, prefix + ".z"));
     }
