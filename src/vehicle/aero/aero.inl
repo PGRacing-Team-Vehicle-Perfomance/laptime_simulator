@@ -1,18 +1,20 @@
-#include "vehicle/aero/aero.h"
-
 #include "config/config.h"
-#include "vehicle/vehicleHelper.h"
+#include "coordTypes.h"
 #include "types.h"
+#include "vehicle/aero/aero.h"
+#include "vehicle/vehicleHelper.h"
 
-template <typename Frame>
-Aero<Frame>::Aero(const Config& config) : cla(config.get("Vehicle", "cla")) {}
+template <typename External>
+Aero<External>::Aero(const Config& config) : cla(config.get("Vehicle", "cla")) {}
 
-template <typename Frame>
-void Aero<Frame>::calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind) {
-    downforce(state, airDensity, wind);
+template <typename External>
+void Aero<External>::calculateInternal(float airDensity, float speedSq) {
+    internalForce.value.z = Z<Internal>{-0.5f * cla * airDensity * speedSq};
 }
 
-template <typename Frame>
-void Aero<Frame>::downforce(VehicleState<Frame> state, float airDensity, Vec<Frame> wind) {
-    this->force.value.z = Z<Frame>{static_cast<float>(-0.5 * cla * airDensity * std::pow(state.velocity.getLength(), 2))};
+template <typename External>
+void Aero<External>::calculate(VehicleState<External> state, float airDensity, Vec<External>) {
+    calculateInternal(airDensity, std::pow(state.velocity.getLength(), 2));
+    this->force.value = toExternal(internalForce.value);
+    this->torque = Torque<External>(toExternal(internalTorque));
 }
