@@ -86,6 +86,10 @@ public:
         return defaultVal;
     }
 
+    bool has(const std::string& module, const std::string& param) const {
+        return data.find(module + "." + param) != data.end();
+    }
+
     std::string getString(const std::string& module, const std::string& param, const std::string& defaultVal = "") const {
         std::string key = module + "." + param;
         auto it = stringData.find(key);
