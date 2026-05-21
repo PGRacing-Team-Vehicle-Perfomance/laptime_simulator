@@ -29,6 +29,8 @@ Vehicle<Frame>::Vehicle(const Config& config,
     aero.value = {config};
     aero.position = config.getVec<Frame>("Vehicle", "claPosition");
 
+    ackermannTable = AckermannTable<ISO8855, Frame>(config);
+
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
 
@@ -166,8 +168,9 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
 template <typename Frame>
 void Vehicle<Frame>::setSteeringAngle(Alpha<Frame> steeringAngle) {
     state.steeringAngle = steeringAngle;
-    state.wheelAngles.FL = Alpha<Frame>(state.steeringAngle);
-    state.wheelAngles.FR = Alpha<Frame>(state.steeringAngle);
+    auto wheelAngles = ackermannTable.lookup(steeringAngle);
+    state.wheelAngles.FL = wheelAngles.left;
+    state.wheelAngles.FR = wheelAngles.right;
     state.wheelAngles.RL = Alpha<Frame>(0);
     state.wheelAngles.RR = Alpha<Frame>(0);
 }

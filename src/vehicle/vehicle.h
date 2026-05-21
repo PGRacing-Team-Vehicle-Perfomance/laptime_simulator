@@ -9,6 +9,7 @@
 #include "config/config.h"
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
+#include "vehicle/steering/ackermannTable.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -38,6 +39,8 @@ class Vehicle {
     VehicleState<Frame> state;
 
     Positioned<Aero<Frame>, Frame> aero;
+
+    AckermannTable<ISO8855, Frame> ackermannTable;
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
