@@ -110,8 +110,7 @@ public:
     }
     
     float angleUnitScale(const std::string& module, const std::string& prefix) const {
-        constexpr float degToRad = M_PI / 180.0f;
-        return getString(module, prefix + ".unit", "rad") == "deg" ? degToRad : 1.0f;
+        return getString(module, prefix + ".unit", "rad") == "deg" ? DEG_TO_RAD : 1.0f;
     }
 
     template <typename Frame>

@@ -9,14 +9,13 @@
 
 template <typename Internal, typename External>
 inline AckermannTable<Internal, External>::AckermannTable(const Config& config) {
-    constexpr float degToRad = M_PI / 180.0f;
     for (int i = 0;; i++) {
         std::string prefix = "ackermannTable." + std::to_string(i);
         if (!config.has("Vehicle", prefix + ".input")) break;
         Entry entry;
-        entry.input = config.get("Vehicle", prefix + ".input") * degToRad;
-        entry.inner = config.get("Vehicle", prefix + ".inner") * degToRad;
-        entry.outer = config.get("Vehicle", prefix + ".outer") * degToRad;
+        entry.input = config.get("Vehicle", prefix + ".input") * DEG_TO_RAD;
+        entry.inner = config.get("Vehicle", prefix + ".inner") * DEG_TO_RAD;
+        entry.outer = config.get("Vehicle", prefix + ".outer") * DEG_TO_RAD;
         entries.push_back(entry);
     }
     std::sort(entries.begin(), entries.end(),
