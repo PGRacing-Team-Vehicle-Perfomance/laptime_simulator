@@ -96,12 +96,12 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     float speed = state.velocity.getLength();
     float earthAcc = config.get("Environment", "earthAcc");
 
-    auto evaluate = [&](float testLatAcc) -> float {
-        state.angularVelocity.z = Z<Frame>{testLatAcc / speed};
+    auto computeLatAccFromGuess = [&](float candidateLatAcc) -> float {
+        state.angularVelocity.z = Z<Frame>{candidateLatAcc / speed};
         slipAngles = calculateSlipAngles();
-        auto testLoads = totalTireLoads(Y<Frame>{testLatAcc}, config);
+        auto candidateLoads = totalTireLoads(Y<Frame>{candidateLatAcc}, config);
         for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-            tires[i].value->calculate(testLoads[i], slipAngles[i], 0);
+            tires[i].value->calculate(candidateLoads[i], slipAngles[i], 0);
             tireForcesX[i] = tires[i].value->getForce().value.x;
             tireForcesY[i] = tires[i].value->getForce().value.y;
             tireMomentsZ[i] = tires[i].value->getTorque().z;
@@ -110,34 +110,34 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     };
 
     float maxAcc = combinedTotalMass.value * earthAcc;
-    float lo = lastLatAcc - 5.0f;
-    float hi = lastLatAcc + 5.0f;
-    float flo = evaluate(lo) - lo;
-    float fhi = evaluate(hi) - hi;
+    float latAccLo = lastLatAcc - 5.0f;
+    float latAccHi = lastLatAcc + 5.0f;
+    float residualLo = computeLatAccFromGuess(latAccLo) - latAccLo;
+    float residualHi = computeLatAccFromGuess(latAccHi) - latAccHi;
 
-    while ((flo > 0) == (fhi > 0)) {
-        lo = std::max(lo - 10.0f, -maxAcc);
-        hi = std::min(hi + 10.0f, maxAcc);
-        flo = evaluate(lo) - lo;
-        fhi = evaluate(hi) - hi;
-        if (lo <= -maxAcc && hi >= maxAcc) break;
+    while ((residualLo > 0) == (residualHi > 0)) {
+        latAccLo = std::max(latAccLo - 10.0f, -maxAcc);
+        latAccHi = std::min(latAccHi + 10.0f, maxAcc);
+        residualLo = computeLatAccFromGuess(latAccLo) - latAccLo;
+        residualHi = computeLatAccFromGuess(latAccHi) - latAccHi;
+        if (latAccLo <= -maxAcc && latAccHi >= maxAcc) break;
     }
 
     for (int i = 0; i < maxIterations; i++) {
-        float mid = (lo + hi) * 0.5f;
-        float fmid = evaluate(mid) - mid;
-        if (std::abs(hi - lo) < tolerance) break;
-        if ((flo > 0) != (fmid > 0)) {
-            hi = mid;
-            fhi = fmid;
+        float latAccMid = (latAccLo + latAccHi) * 0.5f;
+        float residualMid = computeLatAccFromGuess(latAccMid) - latAccMid;
+        if (std::abs(latAccHi - latAccLo) < tolerance) break;
+        if ((residualLo > 0) != (residualMid > 0)) {
+            latAccHi = latAccMid;
+            residualHi = residualMid;
         } else {
-            lo = mid;
-            flo = fmid;
+            latAccLo = latAccMid;
+            residualLo = residualMid;
         }
     }
 
-    Y<Frame> latAcc{(lo + hi) * 0.5f};
-    evaluate(latAcc.v);
+    Y<Frame> latAcc{(latAccLo + latAccHi) * 0.5f};
+    computeLatAccFromGuess(latAcc.v);
     lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
