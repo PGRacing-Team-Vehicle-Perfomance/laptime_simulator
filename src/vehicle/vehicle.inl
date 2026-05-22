@@ -110,34 +110,23 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     };
 
     float maxAcc = combinedTotalMass.value * earthAcc;
-    float latAccLo = lastLatAcc - 5.0f;
-    float latAccHi = lastLatAcc + 5.0f;
+    float latAccLo = -maxAcc;
+    float latAccHi = +maxAcc;
     float residualLo = computeLatAccFromGuess(latAccLo) - latAccLo;
-    float residualHi = computeLatAccFromGuess(latAccHi) - latAccHi;
 
-    while ((residualLo > 0) == (residualHi > 0)) {
-        latAccLo = std::max(latAccLo - 10.0f, -maxAcc);
-        latAccHi = std::min(latAccHi + 10.0f, maxAcc);
-        residualLo = computeLatAccFromGuess(latAccLo) - latAccLo;
-        residualHi = computeLatAccFromGuess(latAccHi) - latAccHi;
-        if (latAccLo <= -maxAcc && latAccHi >= maxAcc) break;
-    }
-
-    for (int i = 0; i < maxIterations; i++) {
-        float latAccMid = (latAccLo + latAccHi) * 0.5f;
+    float latAccMid = latAccLo;
+    for (int i = 0; i < maxIterations && latAccHi - latAccLo > tolerance; i++) {
+        latAccMid = (latAccLo + latAccHi) * 0.5f;
         float residualMid = computeLatAccFromGuess(latAccMid) - latAccMid;
-        if (std::abs(latAccHi - latAccLo) < tolerance) break;
         if ((residualLo > 0) != (residualMid > 0)) {
             latAccHi = latAccMid;
-            residualHi = residualMid;
         } else {
             latAccLo = latAccMid;
             residualLo = residualMid;
         }
     }
 
-    Y<Frame> latAcc{(latAccLo + latAccHi) * 0.5f};
-    computeLatAccFromGuess(latAcc.v);
+    Y<Frame> latAcc{latAccMid};
     lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
