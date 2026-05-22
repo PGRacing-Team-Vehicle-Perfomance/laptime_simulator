@@ -127,7 +127,6 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(
     }
 
     Y<Frame> latAcc{latAccMid};
-    lastLatAcc = latAcc.v;
 
     float yawMomentFromTires = 0;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {

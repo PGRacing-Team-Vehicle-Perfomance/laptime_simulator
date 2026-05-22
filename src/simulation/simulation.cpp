@@ -52,14 +52,12 @@ std::vector<std::array<float, 4>> Simulation::getYawMomentDiagramPoints(
         // Sweep from slip=0 outward in both directions to maintain branch continuity
         std::vector<std::array<float, 4>> steeringPoints;
 
-        v.lastLatAcc = 0;
         for (float s = 0; s <= maxSlipAngle; s += slipAngleStep) {
             v.setChassisSlipAngle(Alpha<Frame>(s * M_PI / 180.f));
             auto dp = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
             steeringPoints.push_back({steeringAngle, s, dp[0], dp[1]});
         }
 
-        v.lastLatAcc = 0;
         for (float s = -slipAngleStep; s >= -maxSlipAngle; s -= slipAngleStep) {
             v.setChassisSlipAngle(Alpha<Frame>(s * M_PI / 180.f));
             auto dp = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
