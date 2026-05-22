@@ -114,11 +114,6 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
 
 template <typename Internal, typename External>
 void TirePacejkaV2<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
-    if (std::fabs(verticalLoad) < 1.0f) {
-        this->internalForce = Force<Internal>(Vec<Internal>(0, 0, 0), Vec<Internal>(0, 0, 0));
-        this->internalTorque = Torque<Internal>(0, 0, 0);
-        return;
-    }
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
     float gamma = 0; // camber

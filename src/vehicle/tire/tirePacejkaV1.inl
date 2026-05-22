@@ -19,11 +19,6 @@ TirePacejkaV1<Internal, External>::TirePacejkaV1(const Config& config, bool isDr
 
 template <typename Internal, typename External>
 void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
-    if (std::fabs(verticalLoad) < 1.0f) {
-        this->internalForce = Force<Internal>(Vec<Internal>(0, 0, 0), Vec<Internal>(0, 0, 0));
-        this->internalTorque = Torque<Internal>(0, 0, 0);
-        return;
-    }
     float Fz = -verticalLoad;
     float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
     float gamma = 0;
