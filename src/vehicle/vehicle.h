@@ -36,7 +36,7 @@ class Vehicle {
 
     VehicleState<Frame> state;
 
-    Positioned<Aero<Frame>, Frame> aero;
+    Positioned<std::unique_ptr<AeroBase<Frame>>, Frame> aero;
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
@@ -67,8 +67,8 @@ class Vehicle {
 
    public:
     Vehicle(const Config& config,
-            WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires);
-    Vehicle() = default;
+            WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
+            Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero);
 
     void setChassisSlipAngle(Alpha<Frame> chassisSlipAngle);
     void setSteeringAngle(Alpha<Frame> steeringAngle);
