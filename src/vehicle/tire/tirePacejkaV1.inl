@@ -18,10 +18,11 @@ TirePacejkaV1<Internal, External>::TirePacejkaV1(const Config& config, bool isDr
 }
 
 template <typename Internal, typename External>
-void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
+void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio,
+                                                          Gamma<Internal> camber) {
     float Fz = -verticalLoad;
-    float alpha = sideRelativeToVehicle == Left ? -slipAngle.v : slipAngle.v;
-    float gamma = 0;
+    float alpha = mirrorBySide(slipAngle.v, sideRelativeToVehicle);
+    float gamma = mirrorBySide(camber.v, sideRelativeToVehicle);
 
     float FNOMIN = tp.at("FNOMIN");
     float dfz = (Fz - FNOMIN) / FNOMIN;
@@ -36,7 +37,7 @@ void TirePacejkaV1<Internal, External>::calculateInternal(float verticalLoad, Al
     float Ey = (tp.at("PEY1") + tp.at("PEY2") * dfz) * (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma) * this->sgn(ay));
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Sv;
 
-    float FySAE = sideRelativeToVehicle == Left ? -Fy : Fy;
+    float FySAE = mirrorBySide(Fy, sideRelativeToVehicle);
     this->internalTorque = Torque<Internal>(0, 0, 0);
     this->internalForce = Force<Internal>(Vec<Internal>(0, FySAE, 0), Vec<Internal>(0, 0, 0));
 }

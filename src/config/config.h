@@ -5,6 +5,7 @@
 #include "types.h"
 #include "vehicle/vehicleHelper.h"
 
+#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <fstream>
@@ -104,14 +105,30 @@ public:
         return wd;
     }
     
+    float angleUnitScale(const std::string& module, const std::string& prefix) const {
+        constexpr float degToRad = M_PI / 180.0f;
+        return getString(module, prefix + ".unit", "rad") == "deg" ? degToRad : 1.0f;
+    }
+
+    template <typename Angle>
+    WheelData<Angle> getAngleWheelData(const std::string& module, const std::string& prefix) const {
+        float scale = angleUnitScale(module, prefix);
+        WheelData<Angle> wd;
+        wd.FL = Angle(get(module, prefix + ".FL") * scale);
+        wd.FR = Angle(get(module, prefix + ".FR") * scale);
+        wd.RL = Angle(get(module, prefix + ".RL") * scale);
+        wd.RR = Angle(get(module, prefix + ".RR") * scale);
+        return wd;
+    }
+
     template <typename Frame>
     WheelData<Alpha<Frame>> getAlphaWheelData(const std::string& module, const std::string& prefix) const {
-        WheelData<Alpha<Frame>> wd;
-        wd.FL = Alpha<Frame>(get(module, prefix + ".FL"));
-        wd.FR = Alpha<Frame>(get(module, prefix + ".FR"));
-        wd.RL = Alpha<Frame>(get(module, prefix + ".RL"));
-        wd.RR = Alpha<Frame>(get(module, prefix + ".RR"));
-        return wd;
+        return getAngleWheelData<Alpha<Frame>>(module, prefix);
+    }
+
+    template <typename Frame>
+    WheelData<Gamma<Frame>> getGammaWheelData(const std::string& module, const std::string& prefix) const {
+        return getAngleWheelData<Gamma<Frame>>(module, prefix);
     }
 
     template <typename Frame>

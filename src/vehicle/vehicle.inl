@@ -23,6 +23,7 @@ Vehicle<Frame>::Vehicle(const Config& config,
       rearTrackWidth(config.get("Vehicle", "rearTrackWidth")),
       trackDistance(config.get("Vehicle", "trackDistance")),
       toeAngle(config.getAlphaWheelData<Frame>("Vehicle", "toeAngle")),
+      camber(config.getGammaWheelData<Frame>("Vehicle", "camber")),
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       aero(std::move(aero)),
@@ -31,6 +32,8 @@ Vehicle<Frame>::Vehicle(const Config& config,
     combinedSuspendedMass = {0, {0, 0, 0}};
 
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        toeAngle[i].v = mirrorBySide(toeAngle[i].v, WHEEL_SIDE[i]);
+        camber[i].v = mirrorBySide(camber[i].v, WHEEL_SIDE[i]);
         combinedNonSuspendedMass.value += nonSuspendedMassAtWheels[i];
         combinedSuspendedMass.value += suspendedMassAtWheels[i];
     }
@@ -95,7 +98,7 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::evaluateAt(Y<Frame> testLatA
     auto loads = totalTireLoads(testLatAcc, config);
     SolverStep step;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tires[i].value->calculate(loads[i], slipAngles[i], 0);
+        tires[i].value->calculate(loads[i], slipAngles[i], 0, camber[i]);
         step.tireForcesX[i] = tires[i].value->getForce().value.x;
         step.tireForcesY[i] = tires[i].value->getForce().value.y;
         step.tireMomentsZ[i] = tires[i].value->getTorque().z;
