@@ -10,6 +10,8 @@ namespace CarConstants {
 static constexpr unsigned int WHEEL_COUNT = 4;
 }
 
+inline constexpr float DEG_TO_RAD = M_PI / 180.0f;
+
 enum Side { Left, Right };
 
 template <typename T>
