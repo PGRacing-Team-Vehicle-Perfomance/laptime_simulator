@@ -30,10 +30,16 @@ Vehicle,rearKarb,1
 Vehicle,frontTrackWidth,1.256
 Vehicle,rearTrackWidth,1.216
 Vehicle,trackDistance,1.53
+Vehicle,toeAngle.unit,deg
 Vehicle,toeAngle.FL,0
 Vehicle,toeAngle.FR,0
 Vehicle,toeAngle.RL,0
 Vehicle,toeAngle.RR,0
+Vehicle,camber.unit,deg
+Vehicle,camber.FL,0
+Vehicle,camber.FR,0
+Vehicle,camber.RL,0
+Vehicle,camber.RR,0
 Tire,frame,SAE
 Tire,implementation,PacejkaV2
 Aero,frame,ISO8855

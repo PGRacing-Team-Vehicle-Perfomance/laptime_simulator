@@ -22,7 +22,8 @@ float TireSimple<Internal, External>::calculateForce(float verticalLoad, bool is
 }
 
 template <typename Internal, typename External>
-void TireSimple<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio) {
+void TireSimple<Internal, External>::calculateInternal(float verticalLoad, Alpha<Internal>, float,
+                                                       Gamma<Internal>) {
     float Fy = calculateForce(verticalLoad, true);
     this->internalTorque = Torque<Internal>(0, 0, 0);
     this->internalForce = Force<Internal>(Vec<Internal>(0, Fy, 0), Vec<Internal>(0, 0, 0));

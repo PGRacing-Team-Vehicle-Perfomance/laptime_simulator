@@ -10,6 +10,13 @@ namespace CarConstants {
 static constexpr unsigned int WHEEL_COUNT = 4;
 }
 
+enum Side { Left, Right };
+
+template <typename T>
+constexpr T mirrorBySide(T value, Side side) {
+    return side == Left ? -value : value;
+}
+
 template <typename T>
 struct WheelData {
     T FL;
@@ -45,6 +52,8 @@ struct WheelData {
         return FL;
     }
 };
+
+inline constexpr WheelData<Side> WHEEL_SIDE{Left, Right, Left, Right};
 
 template <typename Frame>
 struct VehicleState {

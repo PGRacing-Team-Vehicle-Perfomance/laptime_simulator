@@ -33,6 +33,7 @@ class Vehicle {
     float trackDistance;
 
     WheelData<Alpha<Frame>> toeAngle;
+    WheelData<Gamma<Frame>> camber;
 
     VehicleState<Frame> state;
 
