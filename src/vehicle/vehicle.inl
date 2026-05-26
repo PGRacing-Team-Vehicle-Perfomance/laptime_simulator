@@ -15,7 +15,8 @@
 
 template <typename Frame>
 Vehicle<Frame>::Vehicle(const Config& config,
-                        WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires)
+                        WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
+                        Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero)
     : rollCenterHeightFront(config.get("Vehicle", "rollCenterHeightFront")),
       rollCenterHeightBack(config.get("Vehicle", "rollCenterHeightBack")),
       frontTrackWidth(config.get("Vehicle", "frontTrackWidth")),
@@ -24,10 +25,8 @@ Vehicle<Frame>::Vehicle(const Config& config,
       toeAngle(config.getAlphaWheelData<Frame>("Vehicle", "toeAngle")),
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
+      aero(std::move(aero)),
       tires(std::move(tires)) {
-    aero.value = {config};
-    aero.position = config.getVec<Frame>("Vehicle", "claPosition");
-
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
 
@@ -345,11 +344,11 @@ WheelData<float> Vehicle<Frame>::distributeForces(float totalForce, float frontD
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::aeroLoad(const Config& config) {
     float airDensityVal = config.get("Environment", "airDensity");
-    Vec<Frame> wind = config.getVec<Frame>("Environment", "wind");
 
-    aero.value.calculate(state, airDensityVal, wind);
-    // TODO: cla sign bug — force.z > 0 = lift, negate to get downforce
-    return distributeForces(-aero.value.getForce().value.z.v, aero.position.x.v, aero.position.y.v);
+    aero.value->calculate(state, airDensityVal);
+    Transform<Frame, ISO8855> toIso;
+    float load = -toIso(aero.value->getForce().value.z).v;
+    return distributeForces(load, aero.position.x.v, aero.position.y.v);
 }
 
 template <typename Frame>
