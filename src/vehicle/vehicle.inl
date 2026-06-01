@@ -292,14 +292,30 @@ WheelData<Y<Frame>> Vehicle<Frame>::getVelocityFyFromTireForces(const WheelData<
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc, const Config& config) {
     float earthAcc = config.get("Environment", "earthAcc");
-    auto static_load = staticLoad(earthAcc);
-    auto aero = aeroLoad(config);
+    auto staticLoads = staticLoad(earthAcc);
+    auto aeroLoads = aeroLoad(config);
     auto transfer = loadTransfer(latAcc);
     WheelData<float> tireLoads;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tireLoads[i] = std::max(0.f, static_load[i] + aero[i] + transfer[i]);
+        tireLoads[i] = staticLoads[i] + aeroLoads[i] + transfer[i];
     }
+
+    resolveAxleLiftOff(tireLoads.FL, tireLoads.FR);
+    resolveAxleLiftOff(tireLoads.RL, tireLoads.RR);
+
     return tireLoads;
+}
+
+template <typename Frame>
+void Vehicle<Frame>::resolveAxleLiftOff(float& leftLoad, float& rightLoad) {
+    float axleLoad = std::max(0.f, leftLoad + rightLoad);
+    if (leftLoad < 0.f) {
+        leftLoad = 0.f;
+        rightLoad = axleLoad;
+    } else if (rightLoad < 0.f) {
+        rightLoad = 0.f;
+        leftLoad = axleLoad;
+    }
 }
 
 template <typename Frame>

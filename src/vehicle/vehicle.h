@@ -56,6 +56,7 @@ class Vehicle {
                                     const Config& config);
     WheelData<float> aeroLoad(const Config& config);
     WheelData<float> loadTransfer(Y<Frame> latAcc);
+    void resolveAxleLiftOff(float& leftLoad, float& rightLoad);
     WheelData<Y<Frame>> getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<X<Frame>> getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
