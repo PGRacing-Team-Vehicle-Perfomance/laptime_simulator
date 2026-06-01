@@ -9,6 +9,44 @@
 #include <utility>
 
 template <typename Frame>
+inline typename SteeringTable<Frame>::Entry SteeringTable<Frame>::loadEntry(
+    const Config& config, const std::string& entryPrefix, float scale) {
+    if (!config.has("Vehicle", entryPrefix + ".inner") ||
+        !config.has("Vehicle", entryPrefix + ".outer")) {
+        throw std::runtime_error(entryPrefix +
+                                 " missing .inner or .outer (both required alongside .input)");
+    }
+    Entry entry;
+    entry.input = config.get("Vehicle", entryPrefix + ".input") * scale;
+    entry.inner = config.get("Vehicle", entryPrefix + ".inner") * scale;
+    entry.outer = config.get("Vehicle", entryPrefix + ".outer") * scale;
+    return entry;
+}
+
+template <typename Frame>
+inline void SteeringTable<Frame>::checkNoEntryGap(const Config& config, const std::string& prefix,
+                                                  int validCount) {
+    constexpr int forwardScan = 16;
+    for (int j = validCount + 1; j <= validCount + forwardScan; j++) {
+        std::string entryPrefix = prefix + "." + std::to_string(j);
+        if (config.has("Vehicle", entryPrefix + ".input")) {
+            throw std::runtime_error(prefix + " has gap at index " + std::to_string(validCount) +
+                                     " (index " + std::to_string(j) + " is present)");
+        }
+    }
+}
+
+template <typename Frame>
+inline void SteeringTable<Frame>::checkNoOrphanAsymKeys(const Config& config) {
+    if (config.has("Vehicle", "steeringTable.left.0.input") ||
+        config.has("Vehicle", "steeringTable.right.0.input")) {
+        throw std::runtime_error(
+            "steeringTable.left.*/right.* keys present but symmetry=1 (symmetric mode); "
+            "set steeringTable.symmetry=0 for asymmetric, or remove .left/.right keys");
+    }
+}
+
+template <typename Frame>
 inline std::vector<typename SteeringTable<Frame>::Entry>
 SteeringTable<Frame>::loadEntries(const Config& config, const std::string& prefix, float scale) {
     std::vector<float> rawInputs;
@@ -16,14 +54,10 @@ SteeringTable<Frame>::loadEntries(const Config& config, const std::string& prefi
     for (int i = 0;; i++) {
         std::string entryPrefix = prefix + "." + std::to_string(i);
         if (!config.has("Vehicle", entryPrefix + ".input")) break;
-        float rawInput = config.get("Vehicle", entryPrefix + ".input");
-        Entry entry;
-        entry.input = rawInput * scale;
-        entry.inner = config.get("Vehicle", entryPrefix + ".inner") * scale;
-        entry.outer = config.get("Vehicle", entryPrefix + ".outer") * scale;
-        rawInputs.push_back(rawInput);
-        result.push_back(entry);
+        rawInputs.push_back(config.get("Vehicle", entryPrefix + ".input"));
+        result.push_back(loadEntry(config, entryPrefix, scale));
     }
+    checkNoEntryGap(config, prefix, static_cast<int>(result.size()));
     std::vector<float> sortedRawInputs = rawInputs;
     std::sort(sortedRawInputs.begin(), sortedRawInputs.end());
     for (size_t i = 1; i < sortedRawInputs.size(); i++) {
@@ -60,6 +94,7 @@ inline SteeringTable<Frame>::SteeringTable(const Config& config) {
         hasAnyEntry = true;
     } else {
         mode = Mode::Symmetric;
+        checkNoOrphanAsymKeys(config);
         symEntries = loadEntries(config, "steeringTable", scale);
         hasAnyEntry = !symEntries.empty();
     }
@@ -134,5 +169,6 @@ inline typename SteeringTable<Frame>::InnerOuter SteeringTable<Frame>::lookupAbs
                     entries[i].outer + t * (entries[i + 1].outer - entries[i].outer)};
         }
     }
-    std::unreachable();
+    throw std::runtime_error("steering input " + std::to_string(absInput) +
+                             " is not finite or steeringTable entries are non-monotonic");
 }

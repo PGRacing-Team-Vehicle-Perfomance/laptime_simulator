@@ -41,6 +41,9 @@ class SteeringTable {
 
     static std::vector<Entry> loadEntries(const Config& config, const std::string& prefix,
                                           float scale);
+    static Entry loadEntry(const Config& config, const std::string& entryPrefix, float scale);
+    static void checkNoEntryGap(const Config& config, const std::string& prefix, int validCount);
+    static void checkNoOrphanAsymKeys(const Config& config);
     InnerOuter lookupAbs(const std::vector<Entry>& entries, float absInput) const;
 };
 
