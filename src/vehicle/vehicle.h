@@ -40,6 +40,13 @@ class Vehicle {
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
+    struct SolverStep {
+        Y<Frame> latAcc;
+        WheelData<X<Frame>> tireForcesX;
+        WheelData<Y<Frame>> tireForcesY;
+        WheelData<Z<Frame>> tireMomentsZ;
+    };
+
     WheelData<Alpha<Frame>> calculateSlipAngles();
     WheelData<float> staticLoad(float earthAcc);
     Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
@@ -49,12 +56,14 @@ class Vehicle {
                                     const Config& config);
     WheelData<float> aeroLoad(const Config& config);
     WheelData<float> loadTransfer(Y<Frame> latAcc);
+    void resolveAxleLiftOff(float& leftLoad, float& rightLoad);
     WheelData<Y<Frame>> getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<X<Frame>> getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<Y<Frame>> getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                            const WheelData<Y<Frame>>& tireFy);
+    SolverStep evaluateAt(Y<Frame> testLatAcc, const Config& config);
 
    public:
     Vehicle(const Config& config,
