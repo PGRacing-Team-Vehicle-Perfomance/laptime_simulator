@@ -40,7 +40,7 @@ class Vehicle {
 
     Positioned<std::unique_ptr<AeroBase<Frame>>, Frame> aero;
 
-    SteeringTable<Frame> steeringTable;
+    std::unique_ptr<SteeringTableBase<Frame>> steeringTable;
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
@@ -72,7 +72,8 @@ class Vehicle {
    public:
     Vehicle(const Config& config,
             WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
-            Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero);
+            Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
+            std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable);
 
     void setChassisSlipAngle(Alpha<Frame> chassisSlipAngle);
     void setSteeringAngle(Alpha<Frame> steeringAngle);

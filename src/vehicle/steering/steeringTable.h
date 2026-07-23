@@ -6,20 +6,28 @@
 #include "coordTypes.h"
 
 template <typename Frame>
-class SteeringTable {
+struct SteeringWheelAngles {
+    Alpha<Frame> left;
+    Alpha<Frame> right;
+};
+
+template <typename External>
+class SteeringTableBase {
+   public:
+    virtual ~SteeringTableBase() = default;
+    virtual SteeringWheelAngles<External> lookup(Alpha<External> steeringAngle) const = 0;
+};
+
+template <typename Internal, typename External>
+class SteeringTable : public SteeringTableBase<External> {
    public:
     enum class OutOfRangeBehaviour { Throw, Extrapolate };
     enum class Mode { Symmetric, Asymmetric };
 
-    struct WheelAngles {
-        Alpha<Frame> left;
-        Alpha<Frame> right;
-    };
-
     SteeringTable() = default;
     explicit SteeringTable(const Config& config);
 
-    WheelAngles lookup(Alpha<Frame> steeringAngle) const;
+    SteeringWheelAngles<External> lookup(Alpha<External> steeringAngle) const override;
 
    private:
     struct Entry {
@@ -37,7 +45,8 @@ class SteeringTable {
     std::vector<Entry> asymLeftEntries;
     std::vector<Entry> asymRightEntries;
     OutOfRangeBehaviour outOfRangeBehaviour = OutOfRangeBehaviour::Throw;
-    Transform<Frame, ISO8855> toIso;
+    Transform<External, Internal> toInternal;
+    Transform<Internal, External> toExternal;
 
     static std::vector<Entry> loadEntries(const Config& config, const std::string& prefix,
                                           float scale);

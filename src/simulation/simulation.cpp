@@ -55,6 +55,17 @@ Positioned<std::unique_ptr<AeroBase<VehicleFrame>>, VehicleFrame> Simulation::bu
     return aero;
 }
 
+template <typename VehicleFrame>
+std::unique_ptr<SteeringTableBase<VehicleFrame>> Simulation::buildSteeringTable(Config& cfg) {
+    std::string frameStr = cfg.getString("Vehicle", "steeringTable.frame", "ISO8855");
+    if (frameStr == "ISO8855") {
+        return std::make_unique<SteeringTable<ISO8855, VehicleFrame>>(cfg);
+    } else if (frameStr == "SAE") {
+        return std::make_unique<SteeringTable<SAE, VehicleFrame>>(cfg);
+    }
+    throw std::runtime_error("Unknown steeringTable frame: " + frameStr);
+}
+
 template <typename Frame>
 std::vector<std::array<float, 4>> Simulation::getYawMomentDiagramPoints(
     Vehicle<Frame>& v, float speed, const Config& cfg,
@@ -87,13 +98,15 @@ std::vector<std::array<float, 4>> Simulation::run(){
         using VehicleFrame = ISO8855;
         auto tires = buildTires<VehicleFrame>(cfg);
         auto aero = buildAero<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero));
+        auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
+        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable));
         return getYawMomentDiagramPoints(v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"), cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
     } else if(vehicleFrameStr == "SAE") {
         using VehicleFrame = SAE;
         auto tires = buildTires<VehicleFrame>(cfg);
         auto aero = buildAero<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero));
+        auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
+        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable));
         return getYawMomentDiagramPoints(v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"), cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
     } else {
         throw std::runtime_error("Unknown vehicle frame: " + vehicleFrameStr);

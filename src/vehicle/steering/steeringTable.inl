@@ -1,16 +1,17 @@
 #pragma once
 
-#include "vehicle/steering/steeringTable.h"
-
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
-template <typename Frame>
-inline typename SteeringTable<Frame>::Entry SteeringTable<Frame>::loadEntry(
-    const Config& config, const std::string& entryPrefix, float scale) {
+#include "vehicle/steering/steeringTable.h"
+
+template <typename Internal, typename External>
+inline typename SteeringTable<Internal, External>::Entry
+SteeringTable<Internal, External>::loadEntry(const Config& config, const std::string& entryPrefix,
+                                             float scale) {
     if (!config.has("Vehicle", entryPrefix + ".inner") ||
         !config.has("Vehicle", entryPrefix + ".outer")) {
         throw std::runtime_error(entryPrefix +
@@ -23,9 +24,10 @@ inline typename SteeringTable<Frame>::Entry SteeringTable<Frame>::loadEntry(
     return entry;
 }
 
-template <typename Frame>
-inline void SteeringTable<Frame>::checkNoEntryGap(const Config& config, const std::string& prefix,
-                                                  int validCount) {
+template <typename Internal, typename External>
+inline void SteeringTable<Internal, External>::checkNoEntryGap(const Config& config,
+                                                               const std::string& prefix,
+                                                               int validCount) {
     constexpr int forwardScan = 16;
     for (int j = validCount + 1; j <= validCount + forwardScan; j++) {
         std::string entryPrefix = prefix + "." + std::to_string(j);
@@ -36,8 +38,8 @@ inline void SteeringTable<Frame>::checkNoEntryGap(const Config& config, const st
     }
 }
 
-template <typename Frame>
-inline void SteeringTable<Frame>::checkNoOrphanAsymKeys(const Config& config) {
+template <typename Internal, typename External>
+inline void SteeringTable<Internal, External>::checkNoOrphanAsymKeys(const Config& config) {
     if (config.has("Vehicle", "steeringTable.left.0.input") ||
         config.has("Vehicle", "steeringTable.right.0.input")) {
         throw std::runtime_error(
@@ -46,9 +48,10 @@ inline void SteeringTable<Frame>::checkNoOrphanAsymKeys(const Config& config) {
     }
 }
 
-template <typename Frame>
-inline std::vector<typename SteeringTable<Frame>::Entry>
-SteeringTable<Frame>::loadEntries(const Config& config, const std::string& prefix, float scale) {
+template <typename Internal, typename External>
+inline std::vector<typename SteeringTable<Internal, External>::Entry>
+SteeringTable<Internal, External>::loadEntries(const Config& config, const std::string& prefix,
+                                               float scale) {
     std::vector<float> rawInputs;
     std::vector<Entry> result;
     for (int i = 0;; i++) {
@@ -71,8 +74,8 @@ SteeringTable<Frame>::loadEntries(const Config& config, const std::string& prefi
     return result;
 }
 
-template <typename Frame>
-inline SteeringTable<Frame>::SteeringTable(const Config& config) {
+template <typename Internal, typename External>
+inline SteeringTable<Internal, External>::SteeringTable(const Config& config) {
     float scale = config.angleUnitScale("Vehicle", "steeringTable");
     float symmetryRaw = config.get("Vehicle", "steeringTable.symmetry", 1);
     if (symmetryRaw != 0 && symmetryRaw != 1) {
@@ -104,33 +107,37 @@ inline SteeringTable<Frame>::SteeringTable(const Config& config) {
         outOfRangeBehaviour = OutOfRangeBehaviour::Extrapolate;
     } else {
         throw std::runtime_error(
-            "steeringTable.outOfRangeBehaviour must be 'throw' or 'extrapolate', got: " + behaviour);
+            "steeringTable.outOfRangeBehaviour must be 'throw' or 'extrapolate', got: " +
+            behaviour);
     }
 }
 
-template <typename Frame>
-inline typename SteeringTable<Frame>::WheelAngles SteeringTable<Frame>::lookup(
-    Alpha<Frame> steeringAngle) const {
+template <typename Internal, typename External>
+inline SteeringWheelAngles<External> SteeringTable<Internal, External>::lookup(
+    Alpha<External> steeringAngle) const {
     if (mode == Mode::Symmetric && symEntries.empty()) {
         return {steeringAngle, steeringAngle};
     }
-    float frameSign = (steeringAngle.v >= 0) ? 1.0f : -1.0f;
-    bool physicalLeftTurn = toIso(steeringAngle).v >= 0;
-    float absSteer = std::fabs(steeringAngle.v);
+    Alpha<Internal> internalSteer = toInternal(steeringAngle);
+    bool leftTurn = internalSteer.v >= 0;
+    float sign = leftTurn ? 1.0f : -1.0f;
+    float absSteer = std::fabs(internalSteer.v);
 
     const std::vector<Entry>& table =
-        mode == Mode::Asymmetric ? (physicalLeftTurn ? asymLeftEntries : asymRightEntries)
-                                 : symEntries;
+        mode == Mode::Asymmetric ? (leftTurn ? asymLeftEntries : asymRightEntries) : symEntries;
     InnerOuter io = lookupAbs(table, absSteer);
-    if (physicalLeftTurn) {
-        return {Alpha<Frame>(frameSign * io.inner), Alpha<Frame>(frameSign * io.outer)};
+    if (leftTurn) {
+        return {toExternal(Alpha<Internal>{sign * io.inner}),
+                toExternal(Alpha<Internal>{sign * io.outer})};
     }
-    return {Alpha<Frame>(frameSign * io.outer), Alpha<Frame>(frameSign * io.inner)};
+    return {toExternal(Alpha<Internal>{sign * io.outer}),
+            toExternal(Alpha<Internal>{sign * io.inner})};
 }
 
-template <typename Frame>
-inline typename SteeringTable<Frame>::InnerOuter SteeringTable<Frame>::lookupAbs(
-    const std::vector<Entry>& entries, float absInput) const {
+template <typename Internal, typename External>
+inline typename SteeringTable<Internal, External>::InnerOuter
+SteeringTable<Internal, External>::lookupAbs(const std::vector<Entry>& entries,
+                                             float absInput) const {
     if (absInput <= entries.front().input) {
         if (entries.front().input <= 0) {
             return {entries.front().inner, entries.front().outer};
@@ -142,8 +149,7 @@ inline typename SteeringTable<Frame>::InnerOuter SteeringTable<Frame>::lookupAbs
         if (outOfRangeBehaviour == OutOfRangeBehaviour::Throw) {
             throw std::runtime_error(
                 "steering input " + std::to_string(absInput) +
-                " rad exceeds steeringTable upper bound " +
-                std::to_string(entries.back().input) +
+                " rad exceeds steeringTable upper bound " + std::to_string(entries.back().input) +
                 " rad (set steeringTable.outOfRangeBehaviour=extrapolate to allow)");
         }
         float prevInput = entries.size() >= 2 ? entries[entries.size() - 2].input : 0.0f;

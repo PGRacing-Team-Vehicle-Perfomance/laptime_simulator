@@ -41,6 +41,7 @@ Vehicle,camber.FR,0
 Vehicle,camber.RL,0
 Vehicle,camber.RR,0
 Vehicle,steeringTable.unit,deg
+Vehicle,steeringTable.frame,ISO8855
 Vehicle,steeringTable.symmetry,0
 Vehicle,steeringTable.left.0.input,12
 Vehicle,steeringTable.left.0.inner,13.5
