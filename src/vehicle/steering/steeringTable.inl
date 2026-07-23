@@ -81,7 +81,6 @@ inline SteeringTable<Frame>::SteeringTable(const Config& config) {
             std::to_string(symmetryRaw));
     }
     int symmetry = static_cast<int>(symmetryRaw);
-    bool hasAnyEntry = false;
     if (symmetry == 0) {
         mode = Mode::Asymmetric;
         asymLeftEntries = loadEntries(config, "steeringTable.left", scale);
@@ -91,19 +90,12 @@ inline SteeringTable<Frame>::SteeringTable(const Config& config) {
                 "steeringTable.symmetry=0 (asymmetric) requires both steeringTable.left.* and "
                 "steeringTable.right.* entries");
         }
-        hasAnyEntry = true;
     } else {
         mode = Mode::Symmetric;
         checkNoOrphanAsymKeys(config);
         symEntries = loadEntries(config, "steeringTable", scale);
-        hasAnyEntry = !symEntries.empty();
     }
 
-    bool behaviourSet = config.has("Vehicle", "steeringTable.outOfRangeBehaviour");
-    if (behaviourSet && !hasAnyEntry) {
-        throw std::runtime_error(
-            "steeringTable.outOfRangeBehaviour set but no steeringTable entries defined");
-    }
     std::string behaviour =
         config.getString("Vehicle", "steeringTable.outOfRangeBehaviour", "throw");
     if (behaviour == "throw") {
