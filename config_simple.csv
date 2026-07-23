@@ -11,10 +11,10 @@ Vehicle,nonSuspendedMassAtWheels.FL,7.5
 Vehicle,nonSuspendedMassAtWheels.FR,7.5
 Vehicle,nonSuspendedMassAtWheels.RL,8
 Vehicle,nonSuspendedMassAtWheels.RR,8
-Vehicle,suspendedMassAtWheels.FL,61.5
-Vehicle,suspendedMassAtWheels.FR,64
-Vehicle,suspendedMassAtWheels.RL,67.5
-Vehicle,suspendedMassAtWheels.RR,68
+Vehicle,suspendedMassAtWheels.FL,62.75
+Vehicle,suspendedMassAtWheels.FR,62.75
+Vehicle,suspendedMassAtWheels.RL,67.75
+Vehicle,suspendedMassAtWheels.RR,67.75
 Vehicle,suspendedMassHeight,0.2894
 Vehicle,nonSuspendedMassHeight,0.195
 Vehicle,rollCenterHeightFront,0.0491
@@ -42,6 +42,12 @@ Aero,claPosition.y,0.0
 Aero,claPosition.z,0.0
 Tire,frame,SAE
 Tire,implementation,Simple
+Aero,frame,ISO8855
+Aero,implementation,Simple
+Aero,cla,3.7
+Aero,claPosition.x,0.75
+Aero,claPosition.y,0.0
+Aero,claPosition.z,0.0
 Tire,scalingFac,0.75
 Tire,quadFac,-0.0002
 Tire,linFac,1.5
