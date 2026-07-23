@@ -1,18 +1,11 @@
 #pragma once
 
-#include "config/config.h"
+#include "types.h"
 #include "vehicle/vehicleHelper.h"
 
-template <typename Frame>
-class Aero : public ForcefullObject<Frame> {
-    float cla;
-    
-    void downforce(VehicleState<Frame> state, float airDensity, Vec<Frame> wind);
-
+template <typename External>
+class AeroBase : public ForcefullObject<External> {
    public:
-    Aero(const Config& config);
-    Aero() = default;
-    void calculate(VehicleState<Frame> state, float airDensity, Vec<Frame> wind = {});
+    virtual ~AeroBase() = default;
+    virtual void calculate(VehicleState<External> state, float airDensity) = 0;
 };
-
-#include "aero.inl"
