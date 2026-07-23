@@ -9,13 +9,13 @@
 template <typename Internal, typename External>
 class AeroSimple : public AeroBase<External> {
     Transform<Internal, External> toExternal;
-    Transform<ISO8855, Internal> isoToInternal;
+    Transform<External, Internal> toInternal;
 
     Force<Internal> internalForce;
 
     float cla = 0;
 
-    void calculateInternal(float airDensity, float speedSq);
+    void calculateInternal(float airDensity, float speed);
 
    public:
     AeroSimple() = default;

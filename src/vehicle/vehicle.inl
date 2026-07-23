@@ -139,7 +139,7 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance
         Y<Frame> latAccLo{std::min(prevLatAcc.v, latAcc.v)};
         Y<Frame> latAccHi{std::max(prevLatAcc.v, latAcc.v)};
         float residualLo = (prevLatAcc.v < latAcc.v) ? prevResidual : residual;
-        Y<Frame> latAccMid{(latAccLo.v + latAccHi.v) * 0.5f};
+        Y<Frame> latAccMid;
 
         for (int i = 0; i < maxIterations && latAccHi.v - latAccLo.v > tolerance; i++) {
             latAccMid.v = (latAccLo.v + latAccHi.v) * 0.5f;
