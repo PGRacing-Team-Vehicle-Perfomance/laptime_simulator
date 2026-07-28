@@ -214,20 +214,21 @@ def main():
         sys.exit(f"Simulator binary not found: {binary} (run 'make' first)")
 
     knobs = parse_knobs(args)
-    if not knobs:
-        sys.exit("No changes requested: pass --delta or --spec")
-
     base_lines = read_config_lines(config_path)
-    setups = build_setups(knobs, base_toe_values(config_path))
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    if knobs:
+        setups = build_setups(knobs, base_toe_values(config_path))
+    else:
+        setups = [{"name": "", "label": config_name, "front_delta": 0.0, "rear_delta": 0.0, "overrides": {}}]
+    single = len(setups) == 1
 
     results_dir = os.path.join(repo_root, args.results_dir)
     run_dir, run_id = next_run_dir(results_dir)
-    summary_dir = os.path.join(run_dir, "_summary")
-    os.makedirs(summary_dir, exist_ok=True)
-    print(f"Run {run_id:03d} → {run_dir} ({len(setups)} setups)")
+    os.makedirs(run_dir, exist_ok=True)
+    print(f"Run {run_id:03d} → {run_dir} ({len(setups)} setup{'s' if not single else ''})")
 
     for setup in setups:
-        setup_dir = os.path.join(run_dir, setup["name"])
+        setup_dir = run_dir if single else os.path.join(run_dir, setup["name"])
         os.makedirs(setup_dir, exist_ok=True)
         setup_config = os.path.join(setup_dir, "config.csv")
         with open(setup_config, "w", newline="") as f:
@@ -236,10 +237,13 @@ def main():
         setup_csv = os.path.join(setup_dir, "yaw_diagram.csv")
         shutil.copyfile(produced_csv, setup_csv)
         render_setup(setup_dir, setup_csv, f"{setup['label']} — ")
-        print(f"  {setup['name']} done")
+        print(f"  {setup['name'] or config_name} done")
 
-    for plot_type in MONTAGE_TYPES:
-        build_montage(setups, run_dir, summary_dir, plot_type)
+    if not single:
+        summary_dir = os.path.join(run_dir, "_summary")
+        os.makedirs(summary_dir, exist_ok=True)
+        for plot_type in MONTAGE_TYPES:
+            build_montage(setups, run_dir, summary_dir, plot_type)
 
     print(f"Done: {run_dir}")
 
