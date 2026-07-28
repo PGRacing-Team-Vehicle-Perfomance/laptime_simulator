@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 from plot_yaw_diagram import read_csv, render_isoline_figures, save_figures
-from derivatives import render_derivative_figures
+from derivatives import render_derivative_figures, render_diff_figures, write_enriched_csv
 
 
 TOE_WHEELS = {
@@ -28,7 +28,15 @@ DIRECTION_SIGNS = {
     "both": (-1.0, 1.0),
 }
 
-MONTAGE_TYPES = ["steering", "slip", "combined", "control_heatmap", "stability_heatmap"]
+MONTAGE_TYPES = [
+    "steering",
+    "slip",
+    "combined",
+    "control_heatmap",
+    "stability_heatmap",
+    "control_diff",
+    "stability_diff",
+]
 
 
 def parse_knobs(args):
@@ -152,12 +160,17 @@ def run_simulation(binary, config_path, repo_root):
     return os.path.join(repo_root, "build", "yaw_diagram.csv")
 
 
-def render_setup(setup_dir, csv_path, title_prefix):
+def render_setup(setup_dir, csv_path, title_prefix, base_data=None):
     data = read_csv(csv_path)
     isolines = render_isoline_figures(data, title_prefix)
     save_figures(isolines, setup_dir)
     derivatives = render_derivative_figures(data, title_prefix)
     save_figures(derivatives, setup_dir)
+    write_enriched_csv(csv_path, data)
+    if base_data is not None:
+        diffs = render_diff_figures(data, base_data, title_prefix)
+        save_figures(diffs, setup_dir)
+    return data
 
 
 def montage_axes_levels(setups):
@@ -227,7 +240,7 @@ def main():
     os.makedirs(run_dir, exist_ok=True)
     print(f"Run {run_id:03d} → {run_dir} ({len(setups)} setup{'s' if not single else ''})")
 
-    for setup in setups:
+    def process_setup(setup, base_data):
         setup_dir = run_dir if single else os.path.join(run_dir, setup["name"])
         os.makedirs(setup_dir, exist_ok=True)
         setup_config = os.path.join(setup_dir, "config.csv")
@@ -236,8 +249,16 @@ def main():
         produced_csv = run_simulation(binary, setup_config, repo_root)
         setup_csv = os.path.join(setup_dir, "yaw_diagram.csv")
         shutil.copyfile(produced_csv, setup_csv)
-        render_setup(setup_dir, setup_csv, f"{setup['label']} — ")
+        data = render_setup(setup_dir, setup_csv, f"{setup['label']} — ", base_data)
         print(f"  {setup['name'] or config_name} done")
+        return data
+
+    base_setup = next(s for s in setups if s["front_delta"] == 0.0 and s["rear_delta"] == 0.0)
+    base_data = process_setup(base_setup, None)
+    for setup in setups:
+        if setup is base_setup:
+            continue
+        process_setup(setup, base_data)
 
     if not single:
         summary_dir = os.path.join(run_dir, "_summary")

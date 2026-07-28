@@ -2,6 +2,7 @@
 
 import sys
 import os
+import csv
 import numpy as np
 import matplotlib
 
@@ -179,6 +180,58 @@ def render_derivative_figures(data, title_prefix=""):
             STABILITY_LABEL,
             f"{title_prefix}Stability ∂Mz/∂slip — steering×slip grid",
             "test view on the raw simulation grid",
+        ),
+    }
+
+
+ENRICHED_COLUMNS = ["steering", "slip", "latAcc", "yawMoment", CONTROL_KEY, STABILITY_KEY]
+
+CONTROL_DIFF_KEY = "d_control_vs_base"
+STABILITY_DIFF_KEY = "d_stability_vs_base"
+
+
+def write_enriched_csv(path, data):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(ENRICHED_COLUMNS)
+        for point in data:
+            writer.writerow([point[column] for column in ENRICHED_COLUMNS])
+
+
+def build_diff_data(setup_data, base_data):
+    base_by_state = {(p["steering"], p["slip"]): p for p in base_data}
+    diff_data = []
+    for point in setup_data:
+        base_point = base_by_state.get((point["steering"], point["slip"]))
+        if base_point is None:
+            continue
+        diff_data.append(
+            {
+                "latAcc": base_point["latAcc"],
+                "yawMoment": base_point["yawMoment"],
+                CONTROL_DIFF_KEY: point[CONTROL_KEY] - base_point[CONTROL_KEY],
+                STABILITY_DIFF_KEY: point[STABILITY_KEY] - base_point[STABILITY_KEY],
+            }
+        )
+    return diff_data
+
+
+def render_diff_figures(setup_data, base_data, title_prefix=""):
+    diff_data = build_diff_data(setup_data, base_data)
+    return {
+        "control_diff": render_derivative_field(
+            diff_data,
+            CONTROL_DIFF_KEY,
+            "Δ Control  ∂Mz/∂steering [N·m/°]",
+            f"{title_prefix}Control change vs baseline",
+            "positive = more control response than baseline, on the baseline diagram",
+        ),
+        "stability_diff": render_derivative_field(
+            diff_data,
+            STABILITY_DIFF_KEY,
+            "Δ Stability  ∂Mz/∂slip [N·m/°]",
+            f"{title_prefix}Stability change vs baseline",
+            "positive = more stability response than baseline, on the baseline diagram",
         ),
     }
 
