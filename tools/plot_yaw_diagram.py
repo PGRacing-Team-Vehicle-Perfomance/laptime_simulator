@@ -7,13 +7,11 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.cm import ScalarMappable
-from matplotlib.colors import Normalize
 from collections import defaultdict
 
 
-STEERING_CMAP = "coolwarm"
-SLIP_CMAP = "PRGn"
+STEERING_COLOR = "tab:blue"
+SLIP_COLOR = "tab:red"
 
 LATACC_LABEL = "Lateral acceleration [m/s²]"
 YAWMOMENT_LABEL = "Yaw moment [N·m]"
@@ -42,77 +40,59 @@ def group_by(data, key):
     return grouped
 
 
-def symmetric_norm(values):
-    limit = max(abs(v) for v in values) if values else 1.0
-    return Normalize(vmin=-limit, vmax=limit)
-
-
-def plot_isolines(ax, grouped, sort_key, cmap, norm):
-    mappable = ScalarMappable(norm=norm, cmap=cmap)
-    for angle in sorted(grouped.keys()):
-        points = sorted(grouped[angle], key=lambda p: p[sort_key])
+def plot_steering_isolines(ax, by_steering, color):
+    for steering_angle in sorted(by_steering.keys()):
+        points = sorted(by_steering[steering_angle], key=lambda p: p["slip"])
         x = [p["latAcc"] for p in points]
         y = [p["yawMoment"] for p in points]
-        ax.plot(x, y, color=mappable.to_rgba(angle), alpha=0.85, linewidth=1.0)
-    return mappable
+        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
 
 
-def add_colorbar(fig, ax, mappable, label):
-    cbar = fig.colorbar(mappable, ax=ax, pad=0.02)
-    cbar.set_label(label)
-    return cbar
+def plot_slip_isolines(ax, by_slip, color):
+    for slip_angle in sorted(by_slip.keys()):
+        points = sorted(by_slip[slip_angle], key=lambda p: p["steering"])
+        x = [p["latAcc"] for p in points]
+        y = [p["yawMoment"] for p in points]
+        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
 
 
-def style_axes(ax, title, subtitle):
-    ax.axhline(0.0, color="0.6", linewidth=0.8, zorder=0)
-    ax.axvline(0.0, color="0.6", linewidth=0.8, zorder=0)
+def style_axes(ax, title):
+    ax.axhline(0.0, color="0.7", linewidth=0.8, zorder=0)
+    ax.axvline(0.0, color="0.7", linewidth=0.8, zorder=0)
     ax.set_xlabel(LATACC_LABEL)
     ax.set_ylabel(YAWMOMENT_LABEL)
-    ax.set_title(f"{title}\n{subtitle}", fontsize=11)
+    ax.set_title(title)
     ax.grid(True, alpha=0.3)
 
 
 def render_steering(by_steering, title_prefix=""):
-    norm = symmetric_norm(list(by_steering.keys()))
     fig, ax = plt.subplots(figsize=(10, 8))
-    mappable = plot_isolines(ax, by_steering, "slip", STEERING_CMAP, norm)
-    add_colorbar(fig, ax, mappable, "Steering angle [°]")
-    style_axes(
-        ax,
-        f"{title_prefix}Yaw moment diagram — constant-steering isolines",
-        "each line = fixed steering angle, chassis slip swept",
-    )
+    plot_steering_isolines(ax, by_steering, STEERING_COLOR)
+    ax.plot([], [], color=STEERING_COLOR, label="constant steering")
+    style_axes(ax, f"{title_prefix}Yaw moment diagram — steering isolines")
+    ax.legend(loc="best")
     fig.tight_layout()
     return fig
 
 
 def render_slip(by_slip, title_prefix=""):
-    norm = symmetric_norm(list(by_slip.keys()))
     fig, ax = plt.subplots(figsize=(10, 8))
-    mappable = plot_isolines(ax, by_slip, "steering", SLIP_CMAP, norm)
-    add_colorbar(fig, ax, mappable, "Chassis slip angle [°]")
-    style_axes(
-        ax,
-        f"{title_prefix}Yaw moment diagram — constant-slip isolines",
-        "each line = fixed chassis slip angle, steering swept",
-    )
+    plot_slip_isolines(ax, by_slip, SLIP_COLOR)
+    ax.plot([], [], color=SLIP_COLOR, label="constant chassis slip")
+    style_axes(ax, f"{title_prefix}Yaw moment diagram — chassis slip isolines")
+    ax.legend(loc="best")
     fig.tight_layout()
     return fig
 
 
 def render_combined(by_steering, by_slip, title_prefix=""):
-    steering_norm = symmetric_norm(list(by_steering.keys()))
-    slip_norm = symmetric_norm(list(by_slip.keys()))
-    fig, ax = plt.subplots(figsize=(11, 8))
-    steering_mappable = plot_isolines(ax, by_steering, "slip", STEERING_CMAP, steering_norm)
-    slip_mappable = plot_isolines(ax, by_slip, "steering", SLIP_CMAP, slip_norm)
-    add_colorbar(fig, ax, steering_mappable, "Steering angle [°]")
-    add_colorbar(fig, ax, slip_mappable, "Chassis slip angle [°]")
-    style_axes(
-        ax,
-        f"{title_prefix}Yaw moment diagram (MMM)",
-        "constant-steering (coolwarm) and constant-slip (PRGn) isolines",
-    )
+    fig, ax = plt.subplots(figsize=(10, 8))
+    plot_steering_isolines(ax, by_steering, STEERING_COLOR)
+    plot_slip_isolines(ax, by_slip, SLIP_COLOR)
+    ax.plot([], [], color=STEERING_COLOR, label="constant steering")
+    ax.plot([], [], color=SLIP_COLOR, label="constant chassis slip")
+    style_axes(ax, f"{title_prefix}Yaw moment diagram")
+    ax.legend(loc="best")
     fig.tight_layout()
     return fig
 

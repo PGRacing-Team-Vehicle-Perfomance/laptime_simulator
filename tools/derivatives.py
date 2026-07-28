@@ -51,28 +51,35 @@ def compute_derivatives(data):
     return data
 
 
-def symmetric_value_norm(values):
+def robust_limit(values):
     if not values:
-        return Normalize(vmin=-1.0, vmax=1.0)
-    limit = float(np.percentile(np.abs(values), 98)) or max(abs(v) for v in values)
+        return 1.0
+    return float(np.percentile(np.abs(values), 98)) or max(abs(v) for v in values)
+
+
+def symmetric_value_norm(values):
+    limit = robust_limit(values)
     return Normalize(vmin=-limit, vmax=limit)
 
 
 def render_derivative_field(data, value_key, cbar_label, title, subtitle):
     values = [p[value_key] for p in data]
-    norm = symmetric_value_norm(values)
+    limit = robust_limit(values)
+    norm = Normalize(vmin=-limit, vmax=limit)
+    levels = np.linspace(-limit, limit, 21)
     fig, ax = plt.subplots(figsize=(11, 8))
-    scatter = ax.scatter(
+    field = ax.tricontourf(
         [p["latAcc"] for p in data],
         [p["yawMoment"] for p in data],
-        c=values,
+        values,
+        levels=levels,
         cmap=DERIVATIVE_CMAP,
         norm=norm,
-        s=28,
+        extend="both",
     )
-    cbar = fig.colorbar(scatter, ax=ax, pad=0.02)
+    cbar = fig.colorbar(field, ax=ax, pad=0.02)
     cbar.set_label(cbar_label)
-    style_axes(ax, title, subtitle)
+    style_axes(ax, f"{title}\n{subtitle}")
     fig.tight_layout()
     return fig
 
@@ -92,7 +99,7 @@ def render_derivative_grid(data, value_key, cbar_label, title, subtitle):
     steering_axis, slip_axis, matrix = grid_matrix(data, value_key)
     norm = symmetric_value_norm([p[value_key] for p in data])
     fig, ax = plt.subplots(figsize=(10, 8))
-    mesh = ax.pcolormesh(steering_axis, slip_axis, matrix, cmap=DERIVATIVE_CMAP, norm=norm, shading="nearest")
+    mesh = ax.pcolormesh(steering_axis, slip_axis, matrix, cmap=DERIVATIVE_CMAP, norm=norm, shading="gouraud")
     cbar = fig.colorbar(mesh, ax=ax, pad=0.02)
     cbar.set_label(cbar_label)
     ax.set_xlabel("Steering angle [°]")
