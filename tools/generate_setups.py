@@ -257,10 +257,12 @@ def main():
 
     base_setup = next(s for s in setups if s["front_delta"] == 0.0 and s["rear_delta"] == 0.0)
     base_data = process_setup(base_setup, None)
+    base_csv = os.path.join(run_dir if single else os.path.join(run_dir, base_setup["name"]), "yaw_diagram.csv")
     for setup in setups:
         if setup is base_setup:
             continue
         process_setup(setup, base_data)
+        shutil.copyfile(base_csv, os.path.join(run_dir, setup["name"], "baseline.csv"))
 
     if not single:
         summary_dir = os.path.join(run_dir, "_summary")
