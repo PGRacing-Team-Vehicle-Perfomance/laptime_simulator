@@ -16,7 +16,8 @@
 template <typename Frame>
 Vehicle<Frame>::Vehicle(const Config& config,
                         WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
-                        Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero)
+                        Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
+                        std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable)
     : rollCenterHeightFront(config.get("Vehicle", "rollCenterHeightFront")),
       rollCenterHeightBack(config.get("Vehicle", "rollCenterHeightBack")),
       frontTrackWidth(config.get("Vehicle", "frontTrackWidth")),
@@ -27,6 +28,7 @@ Vehicle<Frame>::Vehicle(const Config& config,
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       aero(std::move(aero)),
+      steeringTable(std::move(steeringTable)),
       tires(std::move(tires)) {
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
@@ -182,8 +184,9 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance
 template <typename Frame>
 void Vehicle<Frame>::setSteeringAngle(Alpha<Frame> steeringAngle) {
     state.steeringAngle = steeringAngle;
-    state.wheelAngles.FL = Alpha<Frame>(state.steeringAngle);
-    state.wheelAngles.FR = Alpha<Frame>(state.steeringAngle);
+    auto wheelAngles = steeringTable->lookup(steeringAngle);
+    state.wheelAngles.FL = wheelAngles.left;
+    state.wheelAngles.FR = wheelAngles.right;
     state.wheelAngles.RL = Alpha<Frame>(0);
     state.wheelAngles.RR = Alpha<Frame>(0);
 }

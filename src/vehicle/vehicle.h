@@ -9,6 +9,7 @@
 #include "config/config.h"
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
+#include "vehicle/steering/steeringTable.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -38,6 +39,8 @@ class Vehicle {
     VehicleState<Frame> state;
 
     Positioned<std::unique_ptr<AeroBase<Frame>>, Frame> aero;
+
+    std::unique_ptr<SteeringTableBase<Frame>> steeringTable;
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
@@ -69,7 +72,8 @@ class Vehicle {
    public:
     Vehicle(const Config& config,
             WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
-            Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero);
+            Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
+            std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable);
 
     void setChassisSlipAngle(Alpha<Frame> chassisSlipAngle);
     void setSteeringAngle(Alpha<Frame> steeringAngle);
