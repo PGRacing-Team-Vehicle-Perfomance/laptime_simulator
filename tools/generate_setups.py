@@ -140,13 +140,59 @@ def build_setups(knobs, base_toe):
                 {
                     "name": f"setup_{index:02d}_{slug}",
                     "label": label,
-                    "front_delta": front_delta,
-                    "rear_delta": rear_delta,
+                    "col": front_delta,
+                    "row": rear_delta,
+                    "is_base": not tags,
                     "overrides": overrides,
                 }
             )
             index += 1
     return setups
+
+
+def config_value(config_path, key):
+    module, param = key.split(".", 1)
+    for row in csv.reader(open(config_path, newline="")):
+        if len(row) >= 3 and row[0] == module and row[1] == param:
+            return float(row[2])
+    raise ValueError(f"parameter '{key}' not found in config")
+
+
+def sweep_values(base_value, args):
+    if args.values:
+        return [float(v) for v in args.values.split(",")]
+    if args.delta is not None:
+        return [base_value + sign * args.delta for sign in DIRECTION_SIGNS[args.direction]]
+    return []
+
+
+def build_generic_setups(param_key, base_value, test_values):
+    values = sorted({base_value} | set(test_values))
+    setups = []
+    for index, value in enumerate(values):
+        is_base = abs(value - base_value) < 1e-12
+        slug = "base" if is_base else f"{param_key.replace('.', '_')}_{value:g}"
+        label = "base" if is_base else f"{param_key} = {value:g}"
+        setups.append(
+            {
+                "name": f"setup_{index:02d}_{slug}",
+                "label": label,
+                "col": value,
+                "row": 0.0,
+                "is_base": is_base,
+                "overrides": {} if is_base else {param_key: value},
+            }
+        )
+    return setups
+
+
+def build_all_setups(args, config_path):
+    if args.param == "toe":
+        setups = build_setups(parse_knobs(args), base_toe_values(config_path))
+        return setups, "front toe", "rear toe"
+    base_value = config_value(config_path, args.param)
+    setups = build_generic_setups(args.param, base_value, sweep_values(base_value, args))
+    return setups, args.param, None
 
 
 def next_run_dir(results_dir):
@@ -176,30 +222,31 @@ def render_setup(setup_dir, csv_path, title_prefix, base_data=None):
 
 
 def montage_axes_levels(setups):
-    front_levels = sorted({s["front_delta"] for s in setups})
-    rear_levels = sorted({s["rear_delta"] for s in setups})
-    return front_levels, rear_levels
+    col_levels = sorted({s["col"] for s in setups})
+    row_levels = sorted({s["row"] for s in setups})
+    return col_levels, row_levels
 
 
-def build_montage(setups, run_dir, summary_dir, plot_type):
-    front_levels, rear_levels = montage_axes_levels(setups)
-    lookup = {(s["front_delta"], s["rear_delta"]): s for s in setups}
-    rows = list(reversed(rear_levels))
-    ncols = len(front_levels)
+def build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label):
+    col_levels, row_levels = montage_axes_levels(setups)
+    lookup = {(s["col"], s["row"]): s for s in setups}
+    rows = list(reversed(row_levels))
+    ncols = len(col_levels)
     nrows = len(rows)
     fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.6 * nrows), squeeze=False)
-    for r, rear_delta in enumerate(rows):
-        for c, front_delta in enumerate(front_levels):
+    for r, row_value in enumerate(rows):
+        for c, col_value in enumerate(col_levels):
             ax = axes[r][c]
             ax.axis("off")
-            setup = lookup.get((front_delta, rear_delta))
+            setup = lookup.get((col_value, row_value))
             if setup is None:
                 continue
             image_path = os.path.join(run_dir, setup["name"], f"{plot_type}.png")
             if os.path.exists(image_path):
                 ax.imshow(mpimg.imread(image_path))
             ax.set_title(setup["label"], fontsize=10)
-    fig.suptitle(f"All setups — {plot_type}  (columns: front toe, rows: rear toe)", fontsize=14)
+    axes_note = f"  (columns: {col_label}, rows: {row_label})" if row_label else f"  (swept: {col_label})"
+    fig.suptitle(f"All setups — {plot_type}{axes_note}", fontsize=14)
     fig.tight_layout()
     out_png = os.path.join(summary_dir, f"all_{plot_type}.png")
     fig.savefig(out_png, dpi=110)
@@ -210,11 +257,12 @@ def build_montage(setups, run_dir, summary_dir, plot_type):
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate a matrix of setup visualizations from a base config.")
     parser.add_argument("--config", required=True, help="base vehicle config CSV")
-    parser.add_argument("--param", default="toe", help="parameter knob (only 'toe' supported for now)")
-    parser.add_argument("--delta", type=float, help="change amount in the parameter unit (deg for toe)")
+    parser.add_argument("--param", default="toe", help="'toe' for the front/rear toe matrix, or a 'Module.param' config key")
+    parser.add_argument("--delta", type=float, help="change the parameter by this amount (relative to baseline)")
+    parser.add_argument("--values", help="comma-separated absolute values of the parameter to test vs baseline")
     parser.add_argument("--direction", default="both", choices=["plus", "minus", "both"])
     parser.add_argument("--axle", default="both", choices=["front", "rear", "both"])
-    parser.add_argument("--spec", help="CSV spec file with columns param,delta,direction,axle")
+    parser.add_argument("--spec", help="CSV spec file with columns param,delta,direction,axle (toe only)")
     parser.add_argument("--binary", default="build/laptime_simulator", help="simulator binary path")
     parser.add_argument("--results-dir", default="results", help="root output directory")
     return parser.parse_args()
@@ -228,14 +276,13 @@ def main():
     if not os.path.exists(binary):
         sys.exit(f"Simulator binary not found: {binary} (run 'make' first)")
 
-    knobs = parse_knobs(args)
     base_lines = read_config_lines(config_path)
     config_name = os.path.splitext(os.path.basename(config_path))[0]
-    if knobs:
-        setups = build_setups(knobs, base_toe_values(config_path))
-    else:
-        setups = [{"name": "", "label": config_name, "front_delta": 0.0, "rear_delta": 0.0, "overrides": {}}]
+    setups, col_label, row_label = build_all_setups(args, config_path)
     single = len(setups) == 1
+    if single:
+        setups[0]["name"] = ""
+        setups[0]["label"] = config_name
 
     results_dir = os.path.join(repo_root, args.results_dir)
     run_dir, run_id = next_run_dir(results_dir)
@@ -255,7 +302,7 @@ def main():
         print(f"  {setup['name'] or config_name} done")
         return data
 
-    base_setup = next(s for s in setups if s["front_delta"] == 0.0 and s["rear_delta"] == 0.0)
+    base_setup = next(s for s in setups if s["is_base"])
     base_data = process_setup(base_setup, None)
     base_csv = os.path.join(run_dir if single else os.path.join(run_dir, base_setup["name"]), "yaw_diagram.csv")
     for setup in setups:
@@ -268,7 +315,7 @@ def main():
         summary_dir = os.path.join(run_dir, "_summary")
         os.makedirs(summary_dir, exist_ok=True)
         for plot_type in MONTAGE_TYPES:
-            build_montage(setups, run_dir, summary_dir, plot_type)
+            build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
 
     print(f"Done: {run_dir}")
 
