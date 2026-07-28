@@ -8,7 +8,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-from scipy.ndimage import gaussian_filter
 
 from plot_yaw_diagram import (
     read_csv,
@@ -69,16 +68,33 @@ FIELD_SMOOTH = 2.5
 FIELD_MASK_LEVEL = 0.05
 
 
+def gaussian_kernel(sigma):
+    radius = int(4 * sigma + 0.5)
+    offsets = np.arange(-radius, radius + 1)
+    kernel = np.exp(-(offsets**2) / (2.0 * sigma**2))
+    return kernel / kernel.sum()
+
+
+def gaussian_blur(matrix, sigma):
+    kernel = gaussian_kernel(sigma)
+    radius = len(kernel) // 2
+    blurred = matrix
+    for axis in (0, 1):
+        padded = np.pad(blurred, [(radius, radius) if a == axis else (0, 0) for a in (0, 1)], mode="edge")
+        blurred = np.apply_along_axis(lambda row: np.convolve(row, kernel, mode="valid"), axis, padded)
+    return blurred
+
+
 def rasterize_field(lat, mz, values):
     lat_edges = np.linspace(lat.min(), lat.max(), FIELD_BINS + 1)
     mz_edges = np.linspace(mz.min(), mz.max(), FIELD_BINS + 1)
     weighted_sum, _, _ = np.histogram2d(lat, mz, bins=(lat_edges, mz_edges), weights=values)
     count, _, _ = np.histogram2d(lat, mz, bins=(lat_edges, mz_edges))
-    smooth_sum = gaussian_filter(weighted_sum, FIELD_SMOOTH, mode="nearest")
-    smooth_count = gaussian_filter(count, FIELD_SMOOTH, mode="nearest")
+    smooth_sum = gaussian_blur(weighted_sum, FIELD_SMOOTH)
+    smooth_count = gaussian_blur(count, FIELD_SMOOTH)
     with np.errstate(invalid="ignore", divide="ignore"):
         field = smooth_sum / smooth_count
-    occupancy = gaussian_filter((count > 0).astype(float), FIELD_SMOOTH, mode="nearest")
+    occupancy = gaussian_blur((count > 0).astype(float), FIELD_SMOOTH)
     field = np.ma.masked_where(occupancy < FIELD_MASK_LEVEL, field)
     extent = (lat_edges[0], lat_edges[-1], mz_edges[0], mz_edges[-1])
     return field.T, extent
