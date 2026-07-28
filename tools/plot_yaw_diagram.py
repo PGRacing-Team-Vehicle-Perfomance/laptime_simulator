@@ -146,12 +146,12 @@ def main():
     path = sys.argv[1]
     data = read_csv(path)
 
-    out_dir = os.path.dirname(os.path.abspath(path))
     base = os.path.basename(path)
-    prefix = (base[:-4] if base.lower().endswith(".csv") else base) + "_"
+    name = base[:-4] if base.lower().endswith(".csv") else base
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(path)), name)
 
     figures = render_isoline_figures(data)
-    save_figures(figures, out_dir, prefix)
+    save_figures(figures, out_dir)
 
 
 if __name__ == "__main__":
