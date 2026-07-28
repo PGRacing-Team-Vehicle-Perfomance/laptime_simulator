@@ -34,6 +34,12 @@ Vehicle,toeAngle.FL,0
 Vehicle,toeAngle.FR,0
 Vehicle,toeAngle.RL,0
 Vehicle,toeAngle.RR,0
+Aero,frame,ISO8855
+Aero,implementation,Simple
+Aero,cla,3.7
+Aero,claPosition.x,0.75
+Aero,claPosition.y,0.0
+Aero,claPosition.z,0.0
 Tire,frame,SAE
 Tire,implementation,Simple
 Aero,frame,ISO8855
