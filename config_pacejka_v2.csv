@@ -21,12 +21,16 @@ Vehicle,rollCenterHeightFront,0.0491
 Vehicle,rollCenterHeightBack,0.0539
 Vehicle,frontSpringMotionRatio,1
 Vehicle,frontArbMotionRatio,1
+Vehicle,frontArbMotionRatio.unit,mm/mm
 Vehicle,frontKspring,70
 Vehicle,frontKarb,100
+Vehicle,frontKarb.unit,N/mm
 Vehicle,rearSpringMotionRatio,1
 Vehicle,rearArbMotionRatio,1
+Vehicle,rearArbMotionRatio.unit,mm/mm
 Vehicle,rearKspring,70
 Vehicle,rearKarb,1
+Vehicle,rearKarb.unit,N/mm
 Vehicle,frontTrackWidth,1.256
 Vehicle,rearTrackWidth,1.216
 Vehicle,trackDistance,1.53

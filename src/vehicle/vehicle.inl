@@ -77,18 +77,20 @@ Vehicle<Frame>::Vehicle(const Config& config,
                                  std::pow(config.get("Vehicle", "frontSpringMotionRatio"), 2);
     float frontTorqueSpring =
         std::pow(frontTrackWidth, 2) * std::tan(M_PI / 180) * frontSpringWheelRate / 2;
-    float frontArbTorque = config.get("Vehicle", "frontKarb") * std::pow(frontTrackWidth, 2) *
-                           std::tan(M_PI / 180) /
-                           std::pow(config.get("Vehicle", "frontArbMotionRatio"), 2);
+    float frontArbTorque = antiRollBarTorque(
+        config.get("Vehicle", "frontKarb"), config.getString("Vehicle", "frontKarb.unit", "N/mm"),
+        config.get("Vehicle", "frontArbMotionRatio"),
+        config.getString("Vehicle", "frontArbMotionRatio.unit", "mm/mm"), frontTrackWidth);
     antiRollStiffnessFront = frontArbTorque + frontTorqueSpring;
 
     float rearSpringWheelRate = config.get("Vehicle", "rearKspring") /
                                 std::pow(config.get("Vehicle", "rearSpringMotionRatio"), 2);
     float rearTorqueSpring =
         std::pow(rearTrackWidth, 2) * std::tan(M_PI / 180) * rearSpringWheelRate / 2;
-    float rearArbTorque = config.get("Vehicle", "rearKarb") * std::pow(rearTrackWidth, 2) *
-                          std::tan(M_PI / 180) /
-                          std::pow(config.get("Vehicle", "rearArbMotionRatio"), 2);
+    float rearArbTorque = antiRollBarTorque(
+        config.get("Vehicle", "rearKarb"), config.getString("Vehicle", "rearKarb.unit", "N/mm"),
+        config.get("Vehicle", "rearArbMotionRatio"),
+        config.getString("Vehicle", "rearArbMotionRatio.unit", "mm/mm"), rearTrackWidth);
     antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
 }
 
