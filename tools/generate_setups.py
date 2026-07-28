@@ -36,6 +36,8 @@ MONTAGE_TYPES = [
     "stability_heatmap",
     "control_diff",
     "stability_diff",
+    "control_diff_grid",
+    "stability_diff_grid",
 ]
 
 

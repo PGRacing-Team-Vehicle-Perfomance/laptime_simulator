@@ -207,6 +207,8 @@ def build_diff_data(setup_data, base_data):
             continue
         diff_data.append(
             {
+                "steering": point["steering"],
+                "slip": point["slip"],
                 "latAcc": base_point["latAcc"],
                 "yawMoment": base_point["yawMoment"],
                 CONTROL_DIFF_KEY: point[CONTROL_KEY] - base_point[CONTROL_KEY],
@@ -232,6 +234,20 @@ def render_diff_figures(setup_data, base_data, title_prefix=""):
             "Δ Stability  ∂Mz/∂slip [N·m/°]",
             f"{title_prefix}Stability change vs baseline",
             "positive = more stability response than baseline, on the baseline diagram",
+        ),
+        "control_diff_grid": render_derivative_grid(
+            diff_data,
+            CONTROL_DIFF_KEY,
+            "Δ Control  ∂Mz/∂steering [N·m/°]",
+            f"{title_prefix}Control change vs baseline — steering×slip grid",
+            "positive = more control response than baseline",
+        ),
+        "stability_diff_grid": render_derivative_grid(
+            diff_data,
+            STABILITY_DIFF_KEY,
+            "Δ Stability  ∂Mz/∂slip [N·m/°]",
+            f"{title_prefix}Stability change vs baseline — steering×slip grid",
+            "positive = more stability response than baseline",
         ),
     }
 
