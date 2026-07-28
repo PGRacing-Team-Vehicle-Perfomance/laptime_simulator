@@ -86,10 +86,6 @@ public:
         return defaultVal;
     }
 
-    bool has(const std::string& module, const std::string& param) const {
-        return stringData.find(module + "." + param) != stringData.end();
-    }
-
     std::string getString(const std::string& module, const std::string& param, const std::string& defaultVal = "") const {
         std::string key = module + "." + param;
         auto it = stringData.find(key);
@@ -110,7 +106,8 @@ public:
     }
     
     float angleUnitScale(const std::string& module, const std::string& prefix) const {
-        return getString(module, prefix + ".unit", "rad") == "deg" ? DEG_TO_RAD : 1.0f;
+        constexpr float degToRad = M_PI / 180.0f;
+        return getString(module, prefix + ".unit", "rad") == "deg" ? degToRad : 1.0f;
     }
 
     template <typename Angle>

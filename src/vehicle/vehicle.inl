@@ -27,7 +27,6 @@ Vehicle<Frame>::Vehicle(const Config& config,
       suspendedMassAtWheels(config.getWheelData<float>("Vehicle", "suspendedMassAtWheels")),
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       aero(std::move(aero)),
-      steeringTable(config),
       tires(std::move(tires)) {
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
@@ -183,9 +182,8 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance
 template <typename Frame>
 void Vehicle<Frame>::setSteeringAngle(Alpha<Frame> steeringAngle) {
     state.steeringAngle = steeringAngle;
-    auto wheelAngles = steeringTable.lookup(steeringAngle);
-    state.wheelAngles.FL = wheelAngles.left;
-    state.wheelAngles.FR = wheelAngles.right;
+    state.wheelAngles.FL = Alpha<Frame>(state.steeringAngle);
+    state.wheelAngles.FR = Alpha<Frame>(state.steeringAngle);
     state.wheelAngles.RL = Alpha<Frame>(0);
     state.wheelAngles.RR = Alpha<Frame>(0);
 }
