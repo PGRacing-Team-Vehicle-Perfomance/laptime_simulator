@@ -8,6 +8,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
+from scipy.ndimage import gaussian_filter
 
 from plot_yaw_diagram import (
     read_csv,
@@ -52,9 +53,10 @@ def compute_derivatives(data):
 
 
 def robust_limit(values):
-    if not values:
+    values = np.asarray(values, dtype=float)
+    if values.size == 0:
         return 1.0
-    return float(np.percentile(np.abs(values), 98)) or max(abs(v) for v in values)
+    return float(np.percentile(np.abs(values), 98)) or float(np.abs(values).max())
 
 
 def symmetric_value_norm(values):
@@ -62,22 +64,44 @@ def symmetric_value_norm(values):
     return Normalize(vmin=-limit, vmax=limit)
 
 
+FIELD_BINS = 80
+FIELD_SMOOTH = 2.5
+FIELD_MASK_LEVEL = 0.05
+
+
+def rasterize_field(lat, mz, values):
+    lat_edges = np.linspace(lat.min(), lat.max(), FIELD_BINS + 1)
+    mz_edges = np.linspace(mz.min(), mz.max(), FIELD_BINS + 1)
+    weighted_sum, _, _ = np.histogram2d(lat, mz, bins=(lat_edges, mz_edges), weights=values)
+    count, _, _ = np.histogram2d(lat, mz, bins=(lat_edges, mz_edges))
+    smooth_sum = gaussian_filter(weighted_sum, FIELD_SMOOTH, mode="nearest")
+    smooth_count = gaussian_filter(count, FIELD_SMOOTH, mode="nearest")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        field = smooth_sum / smooth_count
+    occupancy = gaussian_filter((count > 0).astype(float), FIELD_SMOOTH, mode="nearest")
+    field = np.ma.masked_where(occupancy < FIELD_MASK_LEVEL, field)
+    extent = (lat_edges[0], lat_edges[-1], mz_edges[0], mz_edges[-1])
+    return field.T, extent
+
+
 def render_derivative_field(data, value_key, cbar_label, title, subtitle):
-    values = [p[value_key] for p in data]
+    lat = np.array([p["latAcc"] for p in data])
+    mz = np.array([p["yawMoment"] for p in data])
+    values = np.array([p[value_key] for p in data])
     limit = robust_limit(values)
     norm = Normalize(vmin=-limit, vmax=limit)
-    levels = np.linspace(-limit, limit, 21)
+    raster, extent = rasterize_field(lat, mz, values)
     fig, ax = plt.subplots(figsize=(11, 8))
-    field = ax.tricontourf(
-        [p["latAcc"] for p in data],
-        [p["yawMoment"] for p in data],
-        values,
-        levels=levels,
+    image = ax.imshow(
+        raster,
+        origin="lower",
+        extent=extent,
         cmap=DERIVATIVE_CMAP,
         norm=norm,
-        extend="both",
+        interpolation="bilinear",
+        aspect="auto",
     )
-    cbar = fig.colorbar(field, ax=ax, pad=0.02)
+    cbar = fig.colorbar(image, ax=ax, pad=0.02)
     cbar.set_label(cbar_label)
     style_axes(ax, f"{title}\n{subtitle}")
     fig.tight_layout()
