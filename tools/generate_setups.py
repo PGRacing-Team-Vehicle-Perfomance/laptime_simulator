@@ -161,9 +161,63 @@ def config_value(config_path, key):
 def sweep_values(base_value, args):
     if args.values:
         return [float(v) for v in args.values.split(",")]
+    if args.percent:
+        return [base_value * (1.0 + float(p) / 100.0) for p in args.percent.split(",")]
     if args.delta is not None:
         return [base_value + sign * args.delta for sign in DIRECTION_SIGNS[args.direction]]
     return []
+
+
+def apply_offset(base_value, offset, mode):
+    return base_value * (1.0 + offset / 100.0) if mode == "percent" else base_value + offset
+
+
+def format_offset(offset, mode):
+    return f"{offset:+g}%" if mode == "percent" else format_delta(offset)
+
+
+def pair_levels(args):
+    if args.percent:
+        offsets = {float(p) for p in args.percent.split(",")}
+        return sorted({0.0} | offsets), "percent"
+    if args.delta is not None:
+        offsets = {sign * args.delta for sign in DIRECTION_SIGNS[args.direction]}
+        return sorted({0.0} | offsets), "delta"
+    return [0.0], "delta"
+
+
+def build_pair_setups(front_key, rear_key, base_front, base_rear, levels, mode, axle):
+    front_levels = levels if axle in ("front", "both") else [0.0]
+    rear_levels = levels if axle in ("rear", "both") else [0.0]
+    setups = []
+    index = 0
+    for rear_offset in rear_levels:
+        for front_offset in front_levels:
+            overrides = {}
+            if front_offset != 0.0:
+                overrides[front_key] = apply_offset(base_front, front_offset, mode)
+            if rear_offset != 0.0:
+                overrides[rear_key] = apply_offset(base_rear, rear_offset, mode)
+            is_base = front_offset == 0.0 and rear_offset == 0.0
+            tags = []
+            if front_offset != 0.0:
+                tags.append(f"f{format_offset(front_offset, mode)}")
+            if rear_offset != 0.0:
+                tags.append(f"r{format_offset(rear_offset, mode)}")
+            slug = "base" if is_base else "_".join(tags).replace("%", "pct")
+            label = "base" if is_base else f"F {format_offset(front_offset, mode)} / R {format_offset(rear_offset, mode)}"
+            setups.append(
+                {
+                    "name": f"setup_{index:02d}_{slug}",
+                    "label": label,
+                    "col": front_offset,
+                    "row": rear_offset,
+                    "is_base": is_base,
+                    "overrides": overrides,
+                }
+            )
+            index += 1
+    return setups
 
 
 def build_generic_setups(param_key, base_value, test_values):
@@ -190,6 +244,20 @@ def build_all_setups(args, config_path):
     if args.param == "toe":
         setups = build_setups(parse_knobs(args), base_toe_values(config_path))
         return setups, "front toe", "rear toe"
+    if "." not in args.param:
+        front_key = f"Vehicle.front{args.param}"
+        rear_key = f"Vehicle.rear{args.param}"
+        levels, mode = pair_levels(args)
+        setups = build_pair_setups(
+            front_key,
+            rear_key,
+            config_value(config_path, front_key),
+            config_value(config_path, rear_key),
+            levels,
+            mode,
+            args.axle,
+        )
+        return setups, f"front {args.param}", f"rear {args.param}"
     base_value = config_value(config_path, args.param)
     setups = build_generic_setups(args.param, base_value, sweep_values(base_value, args))
     return setups, args.param, None
@@ -260,6 +328,7 @@ def parse_args():
     parser.add_argument("--param", default="toe", help="'toe' for the front/rear toe matrix, or a 'Module.param' config key")
     parser.add_argument("--delta", type=float, help="change the parameter by this amount (relative to baseline)")
     parser.add_argument("--values", help="comma-separated absolute values of the parameter to test vs baseline")
+    parser.add_argument("--percent", help="comma-separated percentage changes vs baseline, e.g. '-10,-20'")
     parser.add_argument("--direction", default="both", choices=["plus", "minus", "both"])
     parser.add_argument("--axle", default="both", choices=["front", "rear", "both"])
     parser.add_argument("--spec", help="CSV spec file with columns param,delta,direction,axle (toe only)")
