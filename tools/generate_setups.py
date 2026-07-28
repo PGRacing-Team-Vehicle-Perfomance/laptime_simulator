@@ -31,10 +31,6 @@ DIRECTION_SIGNS = {
 MONTAGE_TYPES = ["steering", "slip", "combined", "control_heatmap", "stability_heatmap"]
 
 
-def resolve_axles(axle):
-    return ["front", "rear"] if axle == "both" else [axle]
-
-
 def parse_knobs(args):
     knobs = []
     if args.spec:
@@ -91,34 +87,55 @@ def base_toe_values(config_path):
     return values
 
 
-def build_setups(knobs, base_toe):
-    setups = [{"name": "setup_00_base", "label": "base", "axle": None, "delta": 0.0, "overrides": {}}]
-    index = 1
-    seen = set()
+def format_delta(value):
+    return f"{'+' if value >= 0 else '-'}{abs(value):g}"
+
+
+def axle_toe_overrides(base_toe, axle, delta):
+    overrides = {}
+    for wheel_param, wheel_sign in TOE_WHEELS[axle]:
+        overrides[f"Vehicle.{wheel_param}"] = base_toe.get(wheel_param, 0.0) + wheel_sign * delta
+    return overrides
+
+
+def axle_levels(knobs, axle):
+    levels = {0.0}
     for knob in knobs:
         if knob["param"] != "toe":
             raise ValueError(f"unsupported param '{knob['param']}' (only 'toe' for now)")
-        for axle in resolve_axles(knob["axle"]):
+        if knob["axle"] in (axle, "both"):
             for sign in DIRECTION_SIGNS[knob["direction"]]:
-                delta = sign * knob["delta"]
-                dedup = (axle, round(delta, 6))
-                if dedup in seen:
-                    continue
-                seen.add(dedup)
-                overrides = {}
-                for wheel_param, wheel_sign in TOE_WHEELS[axle]:
-                    overrides[f"Vehicle.{wheel_param}"] = base_toe.get(wheel_param, 0.0) + wheel_sign * delta
-                sign_tag = "+" if delta >= 0 else "-"
-                setups.append(
-                    {
-                        "name": f"setup_{index:02d}_toe_{axle}_{sign_tag}{abs(delta):g}",
-                        "label": f"toe {axle} {sign_tag}{abs(delta):g}°",
-                        "axle": axle,
-                        "delta": delta,
-                        "overrides": overrides,
-                    }
-                )
-                index += 1
+                levels.add(round(sign * knob["delta"], 6))
+    return sorted(levels)
+
+
+def build_setups(knobs, base_toe):
+    front_levels = axle_levels(knobs, "front")
+    rear_levels = axle_levels(knobs, "rear")
+    setups = []
+    index = 0
+    for rear_delta in rear_levels:
+        for front_delta in front_levels:
+            overrides = {}
+            overrides.update(axle_toe_overrides(base_toe, "front", front_delta))
+            overrides.update(axle_toe_overrides(base_toe, "rear", rear_delta))
+            tags = []
+            if front_delta != 0.0:
+                tags.append(f"f{format_delta(front_delta)}")
+            if rear_delta != 0.0:
+                tags.append(f"r{format_delta(rear_delta)}")
+            slug = "base" if not tags else "_".join(tags)
+            label = "base" if not tags else f"F {format_delta(front_delta)} / R {format_delta(rear_delta)}"
+            setups.append(
+                {
+                    "name": f"setup_{index:02d}_{slug}",
+                    "label": label,
+                    "front_delta": front_delta,
+                    "rear_delta": rear_delta,
+                    "overrides": overrides,
+                }
+            )
+            index += 1
     return setups
 
 
@@ -143,40 +160,31 @@ def render_setup(setup_dir, csv_path, title_prefix):
     save_figures(derivatives, setup_dir)
 
 
-def montage_layout(setups):
-    axles = sorted({s["axle"] for s in setups if s["axle"]})
-    deltas = sorted({s["delta"] for s in setups if s["axle"]} | {0.0})
-    base = next(s for s in setups if s["axle"] is None)
-    grid = []
-    for axle in axles:
-        row = []
-        for delta in deltas:
-            if delta == 0.0:
-                row.append(base)
-            else:
-                row.append(next((s for s in setups if s["axle"] == axle and s["delta"] == delta), None))
-        grid.append((axle, row))
-    return deltas, grid
+def montage_axes_levels(setups):
+    front_levels = sorted({s["front_delta"] for s in setups})
+    rear_levels = sorted({s["rear_delta"] for s in setups})
+    return front_levels, rear_levels
 
 
 def build_montage(setups, run_dir, summary_dir, plot_type):
-    deltas, grid = montage_layout(setups)
-    if not grid:
-        return
-    ncols = len(deltas)
-    nrows = len(grid)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.4 * nrows), squeeze=False)
-    for r, (axle, row) in enumerate(grid):
-        for c, setup in enumerate(row):
+    front_levels, rear_levels = montage_axes_levels(setups)
+    lookup = {(s["front_delta"], s["rear_delta"]): s for s in setups}
+    rows = list(reversed(rear_levels))
+    ncols = len(front_levels)
+    nrows = len(rows)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.6 * nrows), squeeze=False)
+    for r, rear_delta in enumerate(rows):
+        for c, front_delta in enumerate(front_levels):
             ax = axes[r][c]
             ax.axis("off")
+            setup = lookup.get((front_delta, rear_delta))
             if setup is None:
                 continue
             image_path = os.path.join(run_dir, setup["name"], f"{plot_type}.png")
             if os.path.exists(image_path):
                 ax.imshow(mpimg.imread(image_path))
-            ax.set_title(f"{axle} — {setup['label']}", fontsize=10)
-    fig.suptitle(f"All setups — {plot_type}", fontsize=14)
+            ax.set_title(setup["label"], fontsize=10)
+    fig.suptitle(f"All setups — {plot_type}  (columns: front toe, rows: rear toe)", fontsize=14)
     fig.tight_layout()
     out_png = os.path.join(summary_dir, f"all_{plot_type}.png")
     fig.savefig(out_png, dpi=110)
