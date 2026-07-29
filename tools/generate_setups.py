@@ -12,9 +12,38 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from matplotlib.colors import Normalize
 
 from plot_yaw_diagram import read_csv, render_isoline_figures, save_figures
-from derivatives import render_derivative_figures, render_diff_figures, write_enriched_csv
+from derivatives import (
+    render_derivative_figures,
+    render_diff_figures,
+    write_enriched_csv,
+    compute_derivatives,
+    build_diff_data,
+    draw_field,
+    draw_grid,
+    robust_limit,
+    CONTROL_KEY,
+    STABILITY_KEY,
+    CONTROL_DIFF_KEY,
+    STABILITY_DIFF_KEY,
+)
+
+
+ISOLINE_MONTAGE_TYPES = ["steering", "slip", "combined"]
+
+# plot_type -> (kind, value_key, needs_baseline_diff, colorbar_label)
+HEATMAP_MONTAGE_SPEC = {
+    "control_heatmap": ("field", CONTROL_KEY, False, "Control  ∂Mz/∂steering [N·m/°]"),
+    "stability_heatmap": ("field", STABILITY_KEY, False, "Stability  ∂Mz/∂slip [N·m/°]"),
+    "control_grid": ("grid", CONTROL_KEY, False, "Control  ∂Mz/∂steering [N·m/°]"),
+    "stability_grid": ("grid", STABILITY_KEY, False, "Stability  ∂Mz/∂slip [N·m/°]"),
+    "control_diff": ("field", CONTROL_DIFF_KEY, True, "Δ Control  ∂Mz/∂steering [N·m/°]"),
+    "stability_diff": ("field", STABILITY_DIFF_KEY, True, "Δ Stability  ∂Mz/∂slip [N·m/°]"),
+    "control_diff_grid": ("grid", CONTROL_DIFF_KEY, True, "Δ Control  ∂Mz/∂steering [N·m/°]"),
+    "stability_diff_grid": ("grid", STABILITY_DIFF_KEY, True, "Δ Stability  ∂Mz/∂slip [N·m/°]"),
+}
 
 
 TOE_WHEELS = {
@@ -295,13 +324,43 @@ def montage_axes_levels(setups):
     return col_levels, row_levels
 
 
+def load_setup_data(run_dir, setup):
+    data = read_csv(os.path.join(run_dir, setup["name"], "yaw_diagram.csv"))
+    compute_derivatives(data)
+    return data
+
+
+def montage_cell_data(setups, run_dir, needs_diff):
+    base_data = load_setup_data(run_dir, next(s for s in setups if s["is_base"])) if needs_diff else None
+    cells = {}
+    for setup in setups:
+        if needs_diff and setup["is_base"]:
+            continue
+        data = load_setup_data(run_dir, setup)
+        cells[(setup["col"], setup["row"])] = build_diff_data(data, base_data) if needs_diff else data
+    return cells
+
+
 def build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label):
     col_levels, row_levels = montage_axes_levels(setups)
     lookup = {(s["col"], s["row"]): s for s in setups}
     rows = list(reversed(row_levels))
     ncols = len(col_levels)
     nrows = len(rows)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.6 * nrows), squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(5.5 * ncols, 4.6 * nrows), squeeze=False,
+                             constrained_layout=True)
+
+    spec = HEATMAP_MONTAGE_SPEC.get(plot_type)
+    cells = {}
+    norm = None
+    if spec:
+        _, value_key, needs_diff, _ = spec
+        cells = montage_cell_data(setups, run_dir, needs_diff)
+        all_values = [p[value_key] for data in cells.values() for p in data]
+        limit = robust_limit(all_values) if all_values else 1.0
+        norm = Normalize(vmin=-limit, vmax=limit)
+
+    mappable = None
     for r, row_value in enumerate(rows):
         for c, col_value in enumerate(col_levels):
             ax = axes[r][c]
@@ -309,13 +368,24 @@ def build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
             setup = lookup.get((col_value, row_value))
             if setup is None:
                 continue
-            image_path = os.path.join(run_dir, setup["name"], f"{plot_type}.png")
-            if os.path.exists(image_path):
-                ax.imshow(mpimg.imread(image_path))
+            if spec:
+                data = cells.get((col_value, row_value))
+                if data is not None:
+                    kind, value_key = spec[0], spec[1]
+                    mappable = draw_field(ax, data, value_key, norm) if kind == "field" \
+                        else draw_grid(ax, data, value_key, norm)
+            else:
+                image_path = os.path.join(run_dir, setup["name"], f"{plot_type}.png")
+                if os.path.exists(image_path):
+                    ax.imshow(mpimg.imread(image_path))
             ax.set_title(setup["label"], fontsize=10)
+
+    if spec and mappable is not None:
+        cbar = fig.colorbar(mappable, ax=axes.ravel().tolist(), fraction=0.02, pad=0.02)
+        cbar.set_label(spec[3])
+
     axes_note = f"  (columns: {col_label}, rows: {row_label})" if row_label else f"  (swept: {col_label})"
     fig.suptitle(f"All setups — {plot_type}{axes_note}", fontsize=14)
-    fig.tight_layout()
     out_png = os.path.join(summary_dir, f"all_{plot_type}.png")
     fig.savefig(out_png, dpi=110)
     plt.close(fig)

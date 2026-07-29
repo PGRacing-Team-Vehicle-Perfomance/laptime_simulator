@@ -136,6 +136,21 @@ def grid_matrix(data, value_key):
     return np.array(steering_axis), np.array(slip_axis), matrix
 
 
+def draw_field(ax, data, value_key, norm):
+    lat = np.array([p["latAcc"] for p in data])
+    mz = np.array([p["yawMoment"] for p in data])
+    values = np.array([p[value_key] for p in data])
+    raster, extent = rasterize_field(lat, mz, values)
+    return ax.imshow(raster, origin="lower", extent=extent, cmap=DERIVATIVE_CMAP, norm=norm,
+                     interpolation="bilinear", aspect="auto")
+
+
+def draw_grid(ax, data, value_key, norm):
+    steering_axis, slip_axis, matrix = grid_matrix(data, value_key)
+    return ax.pcolormesh(steering_axis, slip_axis, matrix, cmap=DERIVATIVE_CMAP, norm=norm,
+                         shading="gouraud")
+
+
 def render_derivative_grid(data, value_key, cbar_label, title, subtitle):
     steering_axis, slip_axis, matrix = grid_matrix(data, value_key)
     norm = symmetric_value_norm([p[value_key] for p in data])
