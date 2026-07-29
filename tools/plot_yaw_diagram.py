@@ -97,6 +97,21 @@ def render_combined(by_steering, by_slip, title_prefix=""):
     return fig
 
 
+def render_combined_zoom(by_steering, by_slip, data, title_prefix=""):
+    fig = render_combined(by_steering, by_slip, title_prefix)
+    ax = fig.axes[0]
+    max_lat = max(p["latAcc"] for p in data)
+    band = [p for p in data if p["latAcc"] >= 0.8 * max_lat]
+    latitudes = [p["latAcc"] for p in band]
+    moments = [p["yawMoment"] for p in band]
+    x_pad = 0.02 * max_lat
+    y_pad = 0.08 * ((max(moments) - min(moments)) or 1.0)
+    ax.set_xlim(min(latitudes) - x_pad, max_lat + x_pad)
+    ax.set_ylim(min(moments) - y_pad, max(moments) + y_pad)
+    ax.set_title(f"{title_prefix}Yaw moment diagram — zoom on peak lateral acceleration")
+    return fig
+
+
 def render_isoline_figures(data, title_prefix=""):
     by_steering = group_by(data, "steering")
     by_slip = group_by(data, "slip")
@@ -104,6 +119,7 @@ def render_isoline_figures(data, title_prefix=""):
         "steering": render_steering(by_steering, title_prefix),
         "slip": render_slip(by_slip, title_prefix),
         "combined": render_combined(by_steering, by_slip, title_prefix),
+        "combined_zoom": render_combined_zoom(by_steering, by_slip, data, title_prefix),
     }
 
 

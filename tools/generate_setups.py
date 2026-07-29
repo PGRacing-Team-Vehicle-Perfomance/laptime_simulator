@@ -31,7 +31,7 @@ from derivatives import (
 )
 
 
-ISOLINE_MONTAGE_TYPES = ["steering", "slip", "combined"]
+ISOLINE_MONTAGE_TYPES = ["steering", "slip", "combined", "combined_zoom"]
 
 # plot_type -> (kind, value_key, needs_baseline_diff, colorbar_label)
 HEATMAP_MONTAGE_SPEC = {
@@ -57,17 +57,7 @@ DIRECTION_SIGNS = {
     "both": (-1.0, 1.0),
 }
 
-MONTAGE_TYPES = [
-    "steering",
-    "slip",
-    "combined",
-    "control_heatmap",
-    "stability_heatmap",
-    "control_diff",
-    "stability_diff",
-    "control_diff_grid",
-    "stability_diff_grid",
-]
+MONTAGE_TYPES = ISOLINE_MONTAGE_TYPES + list(HEATMAP_MONTAGE_SPEC)
 
 
 def parse_knobs(args):
