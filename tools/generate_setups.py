@@ -269,6 +269,25 @@ def build_generic_setups(param_key, base_value, test_values):
     return setups
 
 
+def build_config_setups(config_paths):
+    setups = []
+    for index, path in enumerate(config_paths):
+        name = os.path.splitext(os.path.basename(path))[0]
+        is_base = index == 0
+        setups.append(
+            {
+                "name": f"setup_{index:02d}_{'base_' + name if is_base else name}",
+                "label": (f"baseline: {name}" if is_base else name),
+                "col": float(index),
+                "row": 0.0,
+                "is_base": is_base,
+                "overrides": {},
+                "config_file": os.path.abspath(path.strip()),
+            }
+        )
+    return setups, "config", None
+
+
 def build_all_setups(args, config_path):
     if args.param == "toe":
         setups = build_setups(parse_knobs(args), base_toe_values(config_path))
@@ -394,7 +413,8 @@ def build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate a matrix of setup visualizations from a base config.")
-    parser.add_argument("--config", required=True, help="base vehicle config CSV")
+    parser.add_argument("--config", help="base vehicle config CSV (for parameter sweeps)")
+    parser.add_argument("--configs", help="comma-separated explicit config CSVs as sweep points; first is the baseline")
     parser.add_argument("--param", default="toe", help="'toe' for the front/rear toe matrix, or a 'Module.param' config key")
     parser.add_argument("--delta", type=float, help="change the parameter by this amount (relative to baseline)")
     parser.add_argument("--values", help="comma-separated absolute values of the parameter to test vs baseline")
@@ -410,14 +430,21 @@ def parse_args():
 def main():
     args = parse_args()
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.abspath(args.config)
     binary = os.path.join(repo_root, args.binary) if not os.path.isabs(args.binary) else args.binary
     if not os.path.exists(binary):
         sys.exit(f"Simulator binary not found: {binary} (run 'make' first)")
+    if not args.config and not args.configs:
+        sys.exit("Provide --config (parameter sweep) or --configs (explicit config points)")
 
-    base_lines = read_config_lines(config_path)
-    config_name = os.path.splitext(os.path.basename(config_path))[0]
-    setups, col_label, row_label = build_all_setups(args, config_path)
+    base_lines = None
+    config_name = ""
+    if args.configs:
+        setups, col_label, row_label = build_config_setups(args.configs.split(","))
+    else:
+        config_path = os.path.abspath(args.config)
+        base_lines = read_config_lines(config_path)
+        config_name = os.path.splitext(os.path.basename(config_path))[0]
+        setups, col_label, row_label = build_all_setups(args, config_path)
     single = len(setups) == 1
     if single:
         setups[0]["name"] = ""
@@ -432,8 +459,11 @@ def main():
         setup_dir = run_dir if single else os.path.join(run_dir, setup["name"])
         os.makedirs(setup_dir, exist_ok=True)
         setup_config = os.path.join(setup_dir, "config.csv")
-        with open(setup_config, "w", newline="") as f:
-            f.writelines(apply_overrides(base_lines, setup["overrides"]))
+        if setup.get("config_file"):
+            shutil.copyfile(setup["config_file"], setup_config)
+        else:
+            with open(setup_config, "w", newline="") as f:
+                f.writelines(apply_overrides(base_lines, setup["overrides"]))
         produced_csv = run_simulation(binary, setup_config, repo_root)
         setup_csv = os.path.join(setup_dir, "yaw_diagram.csv")
         shutil.copyfile(produced_csv, setup_csv)
