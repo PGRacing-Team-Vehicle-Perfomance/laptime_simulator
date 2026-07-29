@@ -18,8 +18,8 @@ from derivatives import render_derivative_figures, render_diff_figures, write_en
 
 
 TOE_WHEELS = {
-    "front": (("toeAngle.FL", 1.0), ("toeAngle.FR", -1.0)),
-    "rear": (("toeAngle.RL", 1.0), ("toeAngle.RR", -1.0)),
+    "front": (("toeAngle.FL", 1.0), ("toeAngle.FR", 1.0)),
+    "rear": (("toeAngle.RL", 1.0), ("toeAngle.RR", 1.0)),
 }
 
 DIRECTION_SIGNS = {
