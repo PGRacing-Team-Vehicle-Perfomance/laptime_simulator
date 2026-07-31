@@ -24,6 +24,8 @@ def read_csv(path):
                     "slip": float(row["slip"]),
                     "latAcc": float(row["latAcc"]),
                     "yawMoment": float(row["yawMoment"]),
+                    "baseSteering": float(row.get("baseSteering", 1.0)) > 0.5,
+                    "baseSlip": float(row.get("baseSlip", 1.0)) > 0.5,
                 }
             )
     return data
@@ -32,23 +34,27 @@ def read_csv(path):
 def plot_steering_isolines(ax, by_steering, color):
     for steering_angle in sorted(by_steering.keys()):
         points = sorted(by_steering[steering_angle], key=lambda p: p["slip"])
-        x = [p["latAcc"] for p in points]
-        y = [p["yawMoment"] for p in points]
-        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
+        ax.plot([p["latAcc"] for p in points], [p["yawMoment"] for p in points],
+                color=color, alpha=0.6, linewidth=0.8)
 
 
 def plot_slip_isolines(ax, by_slip, color):
     for slip_angle in sorted(by_slip.keys()):
         points = sorted(by_slip[slip_angle], key=lambda p: p["steering"])
-        x = [p["latAcc"] for p in points]
-        y = [p["yawMoment"] for p in points]
-        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
+        ax.plot([p["latAcc"] for p in points], [p["yawMoment"] for p in points],
+                color=color, alpha=0.6, linewidth=0.8)
 
 
 def finalize(ax, data, title):
-    x_all = [p["latAcc"] for p in data]
-    y_all = [p["yawMoment"] for p in data]
-    ax.scatter(x_all, y_all, s=6, color="royalblue", alpha=0.6, zorder=5)
+    base = [p for p in data if p["baseSteering"] and p["baseSlip"]]
+    ax.scatter(
+        [p["latAcc"] for p in base],
+        [p["yawMoment"] for p in base],
+        s=6,
+        color="royalblue",
+        alpha=0.6,
+        zorder=5,
+    )
     ax.set_xlabel("Lateral acceleration")
     ax.set_ylabel("Yaw moment")
     ax.set_title(title)
@@ -73,8 +79,10 @@ def main():
     by_steering = defaultdict(list)
     by_slip = defaultdict(list)
     for point in data:
-        by_steering[point["steering"]].append(point)
-        by_slip[point["slip"]].append(point)
+        if point["baseSteering"]:
+            by_steering[point["steering"]].append(point)
+        if point["baseSlip"]:
+            by_slip[point["slip"]].append(point)
 
     base_path = path[:-4] if path.lower().endswith(".csv") else path
 
