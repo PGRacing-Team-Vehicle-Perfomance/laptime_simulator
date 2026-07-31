@@ -14,6 +14,10 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
+constexpr int longitudinalRelaxIterations = 8;
+constexpr int newtonIterations = 12;
+constexpr float newtonStepScale = 10.0f;
+constexpr float newtonSingularJacobianEpsilon = 1e-6f;
 constexpr float minSolveForce = 0.5f;
 constexpr float minWheelLoad = 1.0f;
 constexpr float minWheelSpeed = 1.0f;
@@ -22,8 +26,8 @@ constexpr float drivenAxleEpsilon = 1e-6f;
 constexpr float slipRatioScanStep = 0.015f;
 constexpr int slipRatioScanSteps = 20;
 constexpr float goldenSectionInvPhi = 0.618033988f;
-constexpr int goldenSectionIterations = 20;
-constexpr int forceBisectionIterations = 30;
+constexpr int goldenSectionIterations = 10;
+constexpr int forceBisectionIterations = 18;
 
 template <typename ForceFn>
 inline float ascendingBranchSlipRatio(ForceFn forceAt, float target) {
@@ -76,6 +80,45 @@ inline float ascendingBranchSlipRatio(ForceFn forceAt, float target) {
         }
     }
     return (lo + hi) * 0.5f;
+}
+
+template <typename Residual>
+inline float bracketedRoot(Residual residual, float warmCenter, float fullLo, float fullHi,
+                           float initialStep, float tolerance, int maxIterations) {
+    float lo = std::max(fullLo, warmCenter - initialStep);
+    float hi = std::min(fullHi, warmCenter + initialStep);
+    float fLo = residual(lo);
+    float fHi = residual(hi);
+    float step = initialStep;
+    while (fLo * fHi > 0 && (lo > fullLo || hi < fullHi)) {
+        step *= 2.0f;
+        lo = std::max(fullLo, warmCenter - step);
+        hi = std::min(fullHi, warmCenter + step);
+        fLo = residual(lo);
+        fHi = residual(hi);
+    }
+    if (fLo * fHi > 0) return std::numeric_limits<float>::quiet_NaN();
+
+    float root = 0.5f * (lo + hi);
+    int retainedSide = 0;
+    for (int iter = 0; iter < maxIterations && hi - lo > tolerance; iter++) {
+        root = (lo * fHi - hi * fLo) / (fHi - fLo);
+        float fRoot = residual(root);
+        if (fRoot * fHi > 0) {
+            hi = root;
+            fHi = fRoot;
+            if (retainedSide == -1) fLo *= 0.5f;
+            retainedSide = -1;
+        } else if (fRoot * fLo > 0) {
+            lo = root;
+            fLo = fRoot;
+            if (retainedSide == 1) fHi *= 0.5f;
+            retainedSide = 1;
+        } else {
+            break;
+        }
+    }
+    return root;
 }
 
 template <typename Frame>
@@ -223,27 +266,48 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectLatAcc(const Config& c
         return evaluateAt(Y<Frame>{testLatAcc}, config).latAcc.v - testLatAcc;
     };
 
-    float lo = -maxLatAcc;
-    float hi = maxLatAcc;
+    float root = bracketedRoot(residualAt, 0.0f, -maxLatAcc, maxLatAcc, maxLatAcc, tolerance,
+                               maxIterations);
     SolverStep step;
-    if (residualAt(lo) < 0 || residualAt(hi) > 0) {
+    if (std::isnan(root)) {
         step = evaluateAt(Y<Frame>{0}, config);
-        step.latAcc = Y<Frame>{std::numeric_limits<float>::quiet_NaN()};
+        step.latAcc = Y<Frame>{root};
         return step;
     }
-    for (int iter = 0; iter < maxIterations && hi - lo > tolerance; iter++) {
-        float mid = 0.5f * (lo + hi);
-        if (residualAt(mid) > 0) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    float root = 0.5f * (lo + hi);
     longitudinalAccEstimate = frozenLongAcc;
     longForceDemand = frozenDemand;
     step = evaluateAt(Y<Frame>{root}, config);
     step.latAcc = Y<Frame>{root};
+    return step;
+}
+
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectDemand(const Config& config,
+                                                                 float maxForce, float maxLatAcc,
+                                                                 float tolerance, int maxIterations) {
+    float frozenLongAcc = longitudinalAccEstimate;
+    SolverStep step;
+    auto longResidualAt = [&](float testDemand) {
+        longitudinalAccEstimate = frozenLongAcc;
+        longForceDemand = testDemand;
+        step = bisectLatAcc(config, maxLatAcc, tolerance, maxIterations);
+        return targetLongAcc - calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v;
+    };
+
+    float demandTolerance = combinedTotalMass.value * tolerance;
+    float root = bracketedRoot(longResidualAt, 0.0f, -maxForce, maxForce, maxForce,
+                               demandTolerance, maxIterations);
+    if (std::isnan(root)) {
+        float rLo = longResidualAt(-maxForce);
+        float rHi = longResidualAt(maxForce);
+        if (std::abs(rLo) < std::abs(rHi)) {
+            longResidualAt(-maxForce);
+        } else {
+            longResidualAt(maxForce);
+        }
+        return step;
+    }
+    longResidualAt(root);
     return step;
 }
 
@@ -255,37 +319,58 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
     float maxForce = combinedTotalMass.value * earthAcc * 2.0f;
     float maxLatAcc = lateralAccBracketG * earthAcc;
 
-    float demand = std::max(-maxForce, std::min(maxForce, lastDemand));
-    longitudinalAccEstimate = lastLongAcc;
+    longitudinalAccEstimate = 0;
 
     SolverStep step;
-    bool converged = false;
-    for (int outer = 0; outer < maxIterations; outer++) {
+    for (int outer = 0; outer < longitudinalRelaxIterations; outer++) {
         float frozenLongAcc = longitudinalAccEstimate;
-        longForceDemand = demand;
-        step = bisectLatAcc(config, maxLatAcc, tolerance, maxIterations);
 
-        float actualLongAcc = calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v;
-        float bodyLongAcc = longitudinalAccEstimate;
-        float longResidual = targetLongAcc - actualLongAcc;
+        auto residuals = [&](float latAcc, float demand, float& latResidual, float& longResidual) {
+            longitudinalAccEstimate = frozenLongAcc;
+            longForceDemand = demand;
+            step = evaluateAt(Y<Frame>{latAcc}, config);
+            latResidual = step.latAcc.v - latAcc;
+            longResidual =
+                calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v - targetLongAcc;
+        };
+
+        float latAcc = 0;
+        float demand = 0;
+        float epsLat = newtonStepScale * tolerance;
+        float epsDemand = newtonStepScale * combinedTotalMass.value * tolerance;
+        bool converged = false;
+        for (int iter = 0; iter < newtonIterations; iter++) {
+            float r1, r2;
+            residuals(latAcc, demand, r1, r2);
+            if (std::abs(r1) < tolerance && std::abs(r2) < tolerance) {
+                converged = true;
+                break;
+            }
+            float r1Lat, r2Lat, r1Demand, r2Demand;
+            residuals(latAcc + epsLat, demand, r1Lat, r2Lat);
+            residuals(latAcc, demand + epsDemand, r1Demand, r2Demand);
+            float j11 = (r1Lat - r1) / epsLat, j12 = (r1Demand - r1) / epsDemand;
+            float j21 = (r2Lat - r2) / epsLat, j22 = (r2Demand - r2) / epsDemand;
+            float det = j11 * j22 - j12 * j21;
+            if (std::abs(det) < newtonSingularJacobianEpsilon) break;
+            latAcc -= (j22 * r1 - j12 * r2) / det;
+            demand -= (j11 * r2 - j21 * r1) / det;
+            if (std::abs(latAcc) > maxLatAcc || std::abs(demand) > maxForce) break;
+        }
+
+        if (converged) {
+            float r1, r2;
+            residuals(latAcc, demand, r1, r2);
+        } else {
+            longitudinalAccEstimate = frozenLongAcc;
+            step = bisectDemand(config, maxForce, maxLatAcc, tolerance, maxIterations);
+        }
+
+        float bodyLongAcc = calculateBodyLongAcc(step.tireForcesX, step.tireForcesY).v;
         longitudinalAccEstimate = frozenLongAcc + 0.5f * (bodyLongAcc - frozenLongAcc);
-        float newDemand =
-            std::max(-maxForce, std::min(maxForce, demand + combinedTotalMass.value * longResidual));
-
-        converged = std::abs(longResidual) < tolerance && std::abs(newDemand - demand) < tolerance &&
-                    std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance;
-        demand = newDemand;
-        if (converged) break;
+        if (std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance) break;
     }
 
-    if (!converged) {
-        longForceDemand = demand;
-        step = bisectLatAcc(config, maxLatAcc, tolerance, maxIterations);
-    }
-
-    lastDemand = demand;
-    lastLongAcc = longitudinalAccEstimate;
-    longForceDemand = demand;
     return step;
 }
 
@@ -393,7 +478,7 @@ template <typename Frame>
 typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveLatAcc(const Config& config,
                                                                 float tolerance,
                                                                 int maxIterations) {
-    longitudinalAccEstimate = lastLongAcc;
+    longitudinalAccEstimate = 0;
     longForceDemand = 0;
     float maxLatAcc = lateralAccBracketG * config.get("Environment", "earthAcc");
 
@@ -404,7 +489,6 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveLatAcc(const Config& co
         if (std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance) break;
     }
 
-    lastLongAcc = longitudinalAccEstimate;
     return step;
 }
 
