@@ -1,0 +1,193 @@
+Module,Parameter,Value
+Environment,airTemperature,20
+Environment,airPressure,100
+Environment,airHumidity,50
+Environment,earthAcc,9.81
+Environment,wind.x,0
+Environment,wind.y,0
+Environment,wind.z,0
+Vehicle,frame,ISO8855
+Vehicle,nonSuspendedMassAtWheels.FL,7.5
+Vehicle,nonSuspendedMassAtWheels.FR,7.5
+Vehicle,nonSuspendedMassAtWheels.RL,8
+Vehicle,nonSuspendedMassAtWheels.RR,8
+Vehicle,suspendedMassAtWheels.FL,56.69
+Vehicle,suspendedMassAtWheels.FR,56.69
+Vehicle,suspendedMassAtWheels.RL,58.81
+Vehicle,suspendedMassAtWheels.RR,58.81
+Vehicle,suspendedMassHeight,0.2894
+Vehicle,nonSuspendedMassHeight,0.195
+Vehicle,rollCenterHeightFront,0.061
+Vehicle,rollCenterHeightBack,0.077
+Vehicle,frontSpringMotionRatio,1
+Vehicle,frontArbMotionRatio,0.048
+Vehicle,frontArbMotionRatio.unit,deg/deg
+Vehicle,frontKspring,70100
+Vehicle,frontKarb,1
+Vehicle,frontKarb.unit,Nm/deg
+Vehicle,rearSpringMotionRatio,1
+Vehicle,rearArbMotionRatio,0.059
+Vehicle,rearArbMotionRatio.unit,deg/deg
+Vehicle,rearKspring,61300
+Vehicle,rearKarb,0.89
+Vehicle,rearKarb.unit,Nm/deg
+Vehicle,frontTrackWidth,1.22
+Vehicle,rearTrackWidth,1.22
+Vehicle,trackDistance,1.53
+Vehicle,toeAngle.unit,deg
+Vehicle,toeAngle.FL,0
+Vehicle,toeAngle.FR,0
+Vehicle,toeAngle.RL,0
+Vehicle,toeAngle.RR,0
+Vehicle,camber.unit,deg
+Vehicle,camber.FL,0
+Vehicle,camber.FR,0
+Vehicle,camber.RL,0
+Vehicle,camber.RR,0
+Vehicle,steeringTable.unit,deg
+Vehicle,steeringTable.frame,ISO8855
+Vehicle,steeringTable.symmetry,1
+Vehicle,steeringTable.0.input,12.4
+Vehicle,steeringTable.0.inner,3.153
+Vehicle,steeringTable.0.outer,3.115
+Vehicle,steeringTable.1.input,24.8
+Vehicle,steeringTable.1.inner,6.356
+Vehicle,steeringTable.1.outer,6.203
+Vehicle,steeringTable.2.input,37.2
+Vehicle,steeringTable.2.inner,9.627
+Vehicle,steeringTable.2.outer,9.276
+Vehicle,steeringTable.3.input,49.6
+Vehicle,steeringTable.3.inner,12.984
+Vehicle,steeringTable.3.outer,12.342
+Vehicle,steeringTable.4.input,62
+Vehicle,steeringTable.4.inner,16.45
+Vehicle,steeringTable.4.outer,15.411
+Vehicle,steeringTable.5.input,74.4
+Vehicle,steeringTable.5.inner,20.057
+Vehicle,steeringTable.5.outer,18.493
+Vehicle,steeringTable.6.input,86.8
+Vehicle,steeringTable.6.inner,23.847
+Vehicle,steeringTable.6.outer,21.594
+Vehicle,steeringTable.7.input,99.2
+Vehicle,steeringTable.7.inner,27.88
+Vehicle,steeringTable.7.outer,24.726
+Vehicle,steeringTable.8.input,111.6
+Vehicle,steeringTable.8.inner,32.249
+Vehicle,steeringTable.8.outer,27.896
+Vehicle,steeringTable.9.input,124
+Vehicle,steeringTable.9.inner,37.111
+Vehicle,steeringTable.9.outer,31.115
+Tire,frame,SAE
+Tire,implementation,PacejkaV2
+Aero,frame,ISO8855
+Aero,implementation,Simple
+Aero,cla,3.7
+Aero,claPosition.x,0.765
+Aero,claPosition.y,0.0
+Aero,claPosition.z,0.0
+Tire,PCX1,1.46408
+Tire,PDX1,1.17282
+Tire,PDX2,-1.73694
+Tire,PDX3,-0.797181
+Tire,PEX1,0.119717
+Tire,PEX2,-0.0150631
+Tire,PEX3,-0.250535
+Tire,PEX4,-9.42199
+Tire,PKX1,3.29298
+Tire,PKX2,59.2583
+Tire,PKX3,-0.298518
+Tire,PHX1,0.0335603
+Tire,PHX2,0.0431308
+Tire,PVX1,0.240543
+Tire,PVX2,0.132452
+Tire,RBX1,4.74156
+Tire,RBX2,-4.30644
+Tire,RCX1,-0.675188
+Tire,REX1,0.0221342
+Tire,REX2,0.13104
+Tire,RHX1,0.00116931
+Tire,PCY1,    1.12025
+Tire,PDY1,    2.17116
+Tire,PDY2,    -0.6749
+Tire,PDY3,    9.6864
+Tire,PEY1,    1.01237
+Tire,PEY2,    1.45105
+Tire,PEY3,    -1.01715
+Tire,PEY4,    -3.76685
+Tire,PKY1,    32.4464
+Tire,PKY2,    1.9369
+Tire,PKY3,    0.603066
+Tire,PHY1,    0.0160889
+Tire,PHY2,    0.0259165
+Tire,PHY3,    -0.170641
+Tire,PVY1,    0.0515402
+Tire,PVY2,    -0.0355678
+Tire,PVY3,    1.01254
+Tire,PVY4,    -0.447043
+Tire,QBZ1,    -2.79277
+Tire,QBZ2,    -0.876655
+Tire,QBZ3,    1.29562
+Tire,QBZ5,    0.200041
+Tire,QBZ4,    0.281018
+Tire,QBZ9,    26.2564
+Tire,QBZ10,    0.177473
+Tire,QCZ1,    0.921146
+Tire,QDZ1,    0.905595
+Tire,QDZ2,    0.52887
+Tire,QDZ3,    -0.152378
+Tire,QDZ4,    2.31907
+Tire,QDZ6,    -0.0163036
+Tire,QDZ7,    -0.0218975
+Tire,QDZ8,    -2.69308
+Tire,QDZ9,    0.586642
+Tire,QEZ1,    -347.511
+Tire,QEZ2,    565.462
+Tire,QEZ3,    -106.574
+Tire,QEZ4,    0.113425
+Tire,QEZ5,    -35.6819
+Tire,QHZ1,    -0.00219638
+Tire,QHZ2,    -0.00202769
+Tire,QHZ3,    -0.0671321
+Tire,QHZ4,    -0.0195978
+Tire,FNOMIN,-3000
+Tire,R0,0.2032
+Tire,LFZ0,1
+Tire,LCX,0.857088
+Tire,LCZ,0.857088
+Tire,LMUX,0.86565888
+Tire,LEX,-0.2
+Tire,LKX,1.1
+Tire,LHX,1
+Tire,LVX,1
+Tire,LCY,0.857088
+Tire,LMUY,0.857088
+Tire,LEY,1
+Tire,LKY,1
+Tire,LHY,1
+Tire,LVY,1
+Tire,LTR,1
+Tire,LRES,1
+Tire,LXAL,1
+Tire,LYKA,1
+Tire,LVYKA,1
+Tire,LS,1
+Tire,LKYC,1
+Tire,LKZC,1
+Tire,LMUV,0
+Tire,LMX,1
+Tire,LMY,1
+Tire,LGAX,1
+Tire,LGAY,1
+Tire,LGAZ,1
+Tire,LVMX,1
+Tire,LSGKP,1
+Tire,LSGAL,1
+Tire,LGYR,1
+# tire scaled by 0.857%
+Simlation,maxSlipAngle,11
+Simlation,maxSteeringAngle,58
+Simlation,slipAngleStep,0.25
+Simlation,steeringAngleStep,2
+Simlation,speed,25
+Simlation,tolerance,0.0001
+Simlation,maxIterations,100
