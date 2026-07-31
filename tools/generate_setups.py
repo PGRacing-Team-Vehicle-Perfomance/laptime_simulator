@@ -92,6 +92,7 @@ def read_config_lines(path):
 
 def apply_overrides(lines, overrides):
     result = []
+    matched = set()
     for line in lines:
         stripped = line.rstrip("\n")
         parts = stripped.split(",")
@@ -100,8 +101,12 @@ def apply_overrides(lines, overrides):
             if key in overrides:
                 parts[2] = f"{overrides[key]:g}"
                 result.append(",".join(parts) + "\n")
+                matched.add(key)
                 continue
         result.append(line)
+    missing = set(overrides) - matched
+    if missing:
+        raise KeyError(f"override keys not found in config: {sorted(missing)}")
     return result
 
 
@@ -175,6 +180,21 @@ def config_value(config_path, key):
         if len(row) >= 3 and row[0] == module and row[1] == param:
             return float(row[2])
     raise ValueError(f"parameter '{key}' not found in config")
+
+
+def list_axle_pairs(config_path):
+    fronts, rears = set(), set()
+    for row in csv.reader(open(config_path, newline="")):
+        if len(row) < 2 or row[0] != "Vehicle":
+            continue
+        param = row[1]
+        if "." in param:
+            continue
+        if param.startswith("front"):
+            fronts.add(param[len("front"):])
+        elif param.startswith("rear"):
+            rears.add(param[len("rear"):])
+    return sorted(fronts & rears)
 
 
 def sweep_values(base_value, args):
@@ -310,8 +330,13 @@ def next_run_dir(results_dir):
 
 
 def run_simulation(binary, config_path, repo_root):
+    output = os.path.join(repo_root, "build", "yaw_diagram.csv")
+    if os.path.exists(output):
+        os.remove(output)
     subprocess.run([binary, config_path], cwd=repo_root, check=True, stdout=subprocess.DEVNULL)
-    return os.path.join(repo_root, "build", "yaw_diagram.csv")
+    if not os.path.exists(output):
+        raise RuntimeError(f"simulator did not produce {output}")
+    return output
 
 
 def render_setup(setup_dir, csv_path, title_prefix, base_data=None):
@@ -401,16 +426,56 @@ def build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
     print(f"Saved montage to {out_png}")
 
 
+SETUP_EXAMPLES = """
+how to control the sweep (with 'make setups SETUP_ARGS=\"...\"'):
+
+  what to sweep (choose the --param form):
+    --param toe            front-by-rear symmetric toe matrix
+    --param Karb           a front/rear PAIR: expands to Vehicle.frontKarb and
+                           Vehicle.rearKarb, swept as a front-by-rear matrix
+                           (works for any front<X>/rear<X> pair: Karb, Kspring, ...)
+                           use --axle to sweep only one side
+    --param Vehicle.suspendedMassHeight
+                           one exact config key, swept on its own (--axle ignored)
+    --configs a,b,c        use whole config files as points (first is baseline)
+
+  how to build the range:
+    --delta 0.2            baseline-0.2, baseline, baseline+0.2
+    --delta 0.2 --direction plus    one-sided: baseline and baseline+0.2
+    --delta 0.2 --direction minus   one-sided: baseline-0.2 and baseline
+    --values 1,1.1,1.2     explicit absolute values (baseline added too)
+    --percent -20,-10,10,20   percentage changes vs baseline
+    --axle front           for toe or a front/rear pair: change only the front
+                           side (or rear / both, default both)
+
+examples:
+  make setups
+  make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Karb --percent -20,-10,10,20"
+  make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Karb --delta 0.2 --axle rear"
+  make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Vehicle.suspendedMassHeight --values 0.25,0.29,0.33"
+  make setups SETUP_ARGS="--configs config_pacejka_v2.csv,config_pacejka_v1.csv,config_simple.csv"
+"""
+
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="Generate a matrix of setup visualizations from a base config.")
+    parser = argparse.ArgumentParser(
+        description="Generate a matrix of setup visualizations from a base config.",
+        epilog=SETUP_EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--config", help="base vehicle config CSV (for parameter sweeps)")
     parser.add_argument("--configs", help="comma-separated explicit config CSVs as sweep points; first is the baseline")
     parser.add_argument("--param", default="toe", help="'toe' for the front/rear toe matrix, or a 'Module.param' config key")
-    parser.add_argument("--delta", type=float, help="change the parameter by this amount (relative to baseline)")
+    parser.add_argument("--delta", type=float, help="offset the parameter by +/- this amount around baseline (see --direction)")
     parser.add_argument("--values", help="comma-separated absolute values of the parameter to test vs baseline")
     parser.add_argument("--percent", help="comma-separated percentage changes vs baseline, e.g. '-10,-20'")
-    parser.add_argument("--direction", default="both", choices=["plus", "minus", "both"])
-    parser.add_argument("--axle", default="both", choices=["front", "rear", "both"])
+    parser.add_argument("--direction", default="both", choices=["plus", "minus", "both"],
+                        help="for --delta: sweep one side only or both (default both)")
+    parser.add_argument("--axle", default="both", choices=["front", "rear", "both"],
+                        help="for --param toe or a front/rear pair (e.g. --param Karb): sweep only "
+                             "the front or rear side (default both); ignored for an exact key")
+    parser.add_argument("--list-axle-params", action="store_true",
+                        help="list the front/rear pair params usable as --param X for --config, then exit")
     parser.add_argument("--spec", help="CSV spec file with columns param,delta,direction,axle (toe only)")
     parser.add_argument("--binary", default="build/laptime_simulator", help="simulator binary path")
     parser.add_argument("--results-dir", default="results", help="root output directory")
@@ -419,6 +484,13 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.list_axle_params:
+        config_path = os.path.abspath(args.config or "config_pacejka_v2.csv")
+        print(f"front/rear pair params in {os.path.basename(config_path)} "
+              f"(use as: --param X [--axle front|rear|both]):")
+        for pair in list_axle_pairs(config_path):
+            print(f"  {pair}")
+        return
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     binary = os.path.join(repo_root, args.binary) if not os.path.isabs(args.binary) else args.binary
     if not os.path.exists(binary):

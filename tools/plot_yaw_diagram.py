@@ -3,6 +3,7 @@
 import sys
 import csv
 import os
+import math
 import matplotlib
 
 matplotlib.use("Agg")
@@ -22,14 +23,14 @@ def read_csv(path):
     with open(path, newline="") as csvfile:
         r = csv.DictReader(csvfile)
         for row in r:
-            data.append(
-                {
-                    "steering": float(row["steering"]),
-                    "slip": float(row["slip"]),
-                    "latAcc": float(row["latAcc"]),
-                    "yawMoment": float(row["yawMoment"]),
-                }
-            )
+            point = {
+                "steering": float(row["steering"]),
+                "slip": float(row["slip"]),
+                "latAcc": float(row["latAcc"]),
+                "yawMoment": float(row["yawMoment"]),
+            }
+            if all(math.isfinite(v) for v in point.values()):
+                data.append(point)
     return data
 
 
