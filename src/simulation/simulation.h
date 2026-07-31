@@ -14,12 +14,12 @@ class Simulation {
     template <typename VehicleFrame>
     std::unique_ptr<SteeringTableBase<VehicleFrame>> buildSteeringTable(Config& cfg);
     template <typename Frame>
-    std::vector<std::array<float, 4>> getYawMomentDiagramPoints(
+    std::vector<std::array<float, 6>> getYawMomentDiagramPoints(
         Vehicle<Frame>& v, float speed, const Config& cfg,
         float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle,
         float slipAngleStep, float tolerance, int maxIterations);
 
 public:
     Simulation(Config config) : cfg(config) {}
-    std::vector<std::array<float, 4>> run();
+    std::vector<std::array<float, 6>> run();
 };

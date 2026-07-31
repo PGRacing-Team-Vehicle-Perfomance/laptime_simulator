@@ -12,6 +12,8 @@ class TirePacejkaV2 : public Tire<Internal, External> {
     std::unordered_map<std::string, float> tp;
 
     void MF2002(float Fz, float alpha, float gamma, float kappa);
+    void applyCombinedSlip(float& Fx, float& Fy, float alpha, float kappa, float gamma, float dfz,
+                           float Dy, float Fz);
     void calculateInternal(float verticalLoad, Alpha<Internal> slipAngle, float slipRatio,
                            Gamma<Internal> camber) override;
 

@@ -72,6 +72,8 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
                (1.0 - (tp.at("PEY3") + tp.at("PEY4") * gamma_y) * this->sgn(ay)) * tp.at("LEY");
     float Fy = Dy * sin(Cy * atan(By * ay - Ey * (By * ay - atan(By * ay)))) + Svy;
 
+    applyCombinedSlip(Fx, Fy, alpha, kappa, gamma, dfz, Dy, Fz);
+
     // ================= MECHANICAL TRAIL =================
     float gamma_z = gamma * tp.at("LGAZ");
     float Sht = tp.at("QHZ1") + tp.at("QHZ2") * dfz +
@@ -110,6 +112,52 @@ void TirePacejkaV2<Internal, External>::MF2002(float Fz, float alpha, float gamm
     float MzSAE = mirrorBySide(Mz, sideRelativeToVehicle);
     this->internalTorque = Torque<Internal>(0, 0, MzSAE);
     this->internalForce = Force<Internal>(Vec<Internal>(Fx, FySAE, 0), Vec<Internal>(0, 0, 0));
+}
+
+// ================= COMBINED SLIP (cosine weighing functions, Pacejka 4.3) =================
+template <typename Internal, typename External>
+void TirePacejkaV2<Internal, External>::applyCombinedSlip(float& Fx, float& Fy, float alpha,
+                                                          float kappa, float gamma, float dfz,
+                                                          float Dy, float Fz) {
+    if (std::fabs(kappa) <= 1e-5f || std::fabs(Fz) <= 1.0f) return;
+
+    auto coeff = [&](const std::string& name, float def) {
+        auto it = tp.find(name);
+        return it != tp.end() ? it->second : def;
+    };
+    auto cosWeight = [](float B, float C, float E, float x) {
+        return std::cos(C * std::atan(B * x - E * (B * x - std::atan(B * x))));
+    };
+
+    // Gxa: Fx reduction from slip angle
+    float Bxa = coeff("RBX1", 5.0f) * std::cos(std::atan(coeff("RBX2", 5.0f) * kappa)) *
+                coeff("LXAL", 1.0f);
+    float Cxa = coeff("RCX1", 1.0f);
+    float Exa = std::min(coeff("REX1", 0.0f) + coeff("REX2", 0.0f) * dfz, 1.0f);
+    float Shxa = coeff("RHX1", 0.0f);
+    float Gxa0 = cosWeight(Bxa, Cxa, Exa, Shxa);
+    float Gxa = std::fabs(Gxa0) > 1e-6f ? cosWeight(Bxa, Cxa, Exa, alpha + Shxa) / Gxa0 : 1.0f;
+
+    // Gyk: Fy reduction from slip ratio
+    float Byk = coeff("RBY1", 7.0f) *
+                std::cos(std::atan(coeff("RBY2", 2.5f) * (alpha - coeff("RBY3", 0.0f)))) *
+                coeff("LYKA", 1.0f);
+    float Cyk = coeff("RCY1", 1.0f);
+    float Eyk = std::min(coeff("REY1", 0.0f) + coeff("REY2", 0.0f) * dfz, 1.0f);
+    float Shyk = coeff("RHY1", 0.0f) + coeff("RHY2", 0.0f) * dfz;
+    float Gyk0 = cosWeight(Byk, Cyk, Eyk, Shyk);
+    float Gyk = std::fabs(Gyk0) > 1e-6f ? cosWeight(Byk, Cyk, Eyk, kappa + Shyk) / Gyk0 : 1.0f;
+
+    // SVyk: kappa-induced side force
+    float muy = std::fabs(Dy) / std::fabs(Fz);
+    float DVyk = muy * Fz *
+                 (coeff("RVY1", 0.0f) + coeff("RVY2", 0.0f) * dfz + coeff("RVY3", 0.0f) * gamma) *
+                 std::cos(std::atan(coeff("RVY4", 0.0f) * alpha));
+    float SVyk = DVyk * std::sin(coeff("RVY5", 0.0f) * std::atan(coeff("RVY6", 0.0f) * kappa)) *
+                 coeff("LVYKA", 1.0f);
+
+    Fx *= Gxa;
+    Fy = Fy * Gyk + SVyk;
 }
 
 template <typename Internal, typename External>

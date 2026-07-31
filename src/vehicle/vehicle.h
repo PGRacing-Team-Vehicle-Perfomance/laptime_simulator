@@ -36,6 +36,20 @@ class Vehicle {
     WheelData<Alpha<Frame>> toeAngle;
     WheelData<Gamma<Frame>> camber;
 
+    float driveBiasFront = 0;
+    float brakeBiasFront = 0;
+    float frontDiffLocking = 1;
+    float rearDiffLocking = 1;
+    float dragCoefficientArea = 0;
+    float airDensityValue = 0;
+    bool longEquilibriumEnabled = false;
+    float targetLongAcc = 0;
+    float longForceDemand = 0;
+    float tireCalibrationSlip = 0;
+    float lateralAccBracketG = 4;
+
+    float longitudinalAccEstimate = 0;
+
     VehicleState<Frame> state;
 
     Positioned<std::unique_ptr<AeroBase<Frame>>, Frame> aero;
@@ -55,18 +69,36 @@ class Vehicle {
     WheelData<float> staticLoad(float earthAcc);
     Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
                              const WheelData<Y<Frame>>& tireForcesY);
+    X<Frame> calculatePathLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                                  const WheelData<Y<Frame>>& tireForcesY);
+    X<Frame> calculateBodyLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                                  const WheelData<Y<Frame>>& tireForcesY);
+    float slipRatioForForce(size_t wheel, float load, Alpha<Frame> slipAngle, Gamma<Frame> camber,
+                            float targetFx);
+    float wheelLongSpeed(size_t wheel);
+    void solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
+                   const WheelData<Alpha<Frame>>& slipAngles, float axleDemand, bool hasDiff,
+                   float locking, float& leftSlipRatio, float& rightSlipRatio);
+    SolverStep bisectLatAcc(const Config& config, float maxLatAcc, float tolerance,
+                            int maxIterations);
+    SolverStep bisectDemand(const Config& config, float maxForce, float maxLatAcc, float tolerance,
+                            int maxIterations);
+    SolverStep solveLatAcc(const Config& config, float tolerance, int maxIterations);
+    SolverStep solveCoupled(const Config& config, float tolerance, int maxIterations);
+    void computeTireForces(const WheelData<float>& loads, const WheelData<Alpha<Frame>>& slipAngles,
+                           SolverStep& step);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
-    WheelData<float> totalTireLoads(Y<Frame> latAcc,
-                                    const Config& config);
+    WheelData<float> totalTireLoads(Y<Frame> latAcc, const Config& config);
     WheelData<float> aeroLoad(const Config& config);
     WheelData<float> loadTransfer(Y<Frame> latAcc);
+    WheelData<float> loadTransferLongitudinal(float longAcc);
     void resolveAxleLiftOff(float& leftLoad, float& rightLoad);
     WheelData<Y<Frame>> getVehicleFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<X<Frame>> getVehicleFxFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                    const WheelData<Y<Frame>>& tireFy);
     WheelData<Y<Frame>> getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
-                                                           const WheelData<Y<Frame>>& tireFy);
+                                                    const WheelData<Y<Frame>>& tireFy);
     SolverStep evaluateAt(Y<Frame> testLatAcc, const Config& config);
 
    public:
@@ -80,7 +112,7 @@ class Vehicle {
     void setSpeed(float speed);
 
     std::array<float, 2> calculateLatAccAndYawMoment(float tolerance, int maxIterations,
-                                               const Config& config);
+                                                     const Config& config);
 };
 
 #include "vehicle.inl"

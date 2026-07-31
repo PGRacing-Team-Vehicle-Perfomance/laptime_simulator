@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <numbers>
 
@@ -12,6 +13,113 @@
 #include "vehicle/aero/aero.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
+
+constexpr int longitudinalRelaxIterations = 8;
+constexpr int newtonIterations = 12;
+constexpr float newtonStepScale = 10.0f;
+constexpr float newtonSingularJacobianEpsilon = 1e-6f;
+constexpr float minSolveForce = 0.5f;
+constexpr float minWheelLoad = 1.0f;
+constexpr float minWheelSpeed = 1.0f;
+constexpr float slipRatioClamp = 0.9f;
+constexpr float drivenAxleEpsilon = 1e-6f;
+constexpr float slipRatioScanStep = 0.015f;
+constexpr int slipRatioScanSteps = 20;
+constexpr float goldenSectionInvPhi = 0.618033988f;
+constexpr int goldenSectionIterations = 10;
+constexpr int forceBisectionIterations = 18;
+
+template <typename ForceFn>
+inline float ascendingBranchSlipRatio(ForceFn forceAt, float target) {
+    if (std::abs(target) < minSolveForce) return 0;
+    float direction = target > 0 ? 1.0f : -1.0f;
+
+    float peakSlipRatio = 0;
+    float peakForce = forceAt(0.0f);
+    for (int scan = 1; scan <= slipRatioScanSteps; scan++) {
+        float slipRatio = direction * slipRatioScanStep * scan;
+        float force = forceAt(slipRatio);
+        if (direction * force > direction * peakForce) {
+            peakForce = force;
+            peakSlipRatio = slipRatio;
+        }
+    }
+    float low = peakSlipRatio - direction * slipRatioScanStep;
+    float high = peakSlipRatio + direction * slipRatioScanStep;
+    float c = high - (high - low) * goldenSectionInvPhi;
+    float d = low + (high - low) * goldenSectionInvPhi;
+    float fc = forceAt(c);
+    float fd = forceAt(d);
+    for (int iter = 0; iter < goldenSectionIterations; iter++) {
+        if (direction * fc > direction * fd) {
+            high = d;
+            d = c;
+            fd = fc;
+            c = high - (high - low) * goldenSectionInvPhi;
+            fc = forceAt(c);
+        } else {
+            low = c;
+            c = d;
+            fc = fd;
+            d = low + (high - low) * goldenSectionInvPhi;
+            fd = forceAt(d);
+        }
+    }
+    peakSlipRatio = (low + high) * 0.5f;
+    peakForce = forceAt(peakSlipRatio);
+    if (direction * target >= direction * peakForce) return peakSlipRatio;
+
+    float lo = 0.0f;
+    float hi = peakSlipRatio;
+    for (int iter = 0; iter < forceBisectionIterations; iter++) {
+        float mid = (lo + hi) * 0.5f;
+        if (direction * forceAt(mid) < direction * target) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    return (lo + hi) * 0.5f;
+}
+
+template <typename Residual>
+inline float bracketedRoot(Residual residual, float warmCenter, float fullLo, float fullHi,
+                           float initialStep, float tolerance, int maxIterations) {
+    float lo = std::max(fullLo, warmCenter - initialStep);
+    float hi = std::min(fullHi, warmCenter + initialStep);
+    float fLo = residual(lo);
+    float fHi = residual(hi);
+    float step = initialStep;
+    while (fLo * fHi > 0 && (lo > fullLo || hi < fullHi)) {
+        step *= 2.0f;
+        lo = std::max(fullLo, warmCenter - step);
+        hi = std::min(fullHi, warmCenter + step);
+        fLo = residual(lo);
+        fHi = residual(hi);
+    }
+    if (fLo * fHi > 0) return std::numeric_limits<float>::quiet_NaN();
+
+    float root = 0.5f * (lo + hi);
+    int retainedSide = 0;
+    for (int iter = 0; iter < maxIterations && hi - lo > tolerance; iter++) {
+        root = (lo * fHi - hi * fLo) / (fHi - fLo);
+        float fRoot = residual(root);
+        if (fRoot * fHi > 0) {
+            hi = root;
+            fHi = fRoot;
+            if (retainedSide == -1) fLo *= 0.5f;
+            retainedSide = -1;
+        } else if (fRoot * fLo > 0) {
+            lo = root;
+            fLo = fRoot;
+            if (retainedSide == 1) fHi *= 0.5f;
+            retainedSide = 1;
+        } else {
+            break;
+        }
+    }
+    return root;
+}
 
 template <typename Frame>
 Vehicle<Frame>::Vehicle(const Config& config,
@@ -92,6 +200,18 @@ Vehicle<Frame>::Vehicle(const Config& config,
         config.get("Vehicle", "rearArbMotionRatio"),
         config.getString("Vehicle", "rearArbMotionRatio.unit", "mm/mm"), rearTrackWidth);
     antiRollStiffnessRear = rearArbTorque + rearTorqueSpring;
+
+    driveBiasFront = config.get("Vehicle", "driveBiasFront", 0.0f);
+    brakeBiasFront = config.get("Vehicle", "brakeBiasFront", 0.6f);
+    frontDiffLocking = config.get("Vehicle", "frontDiffLocking", 1.0f);
+    rearDiffLocking = config.get("Vehicle", "rearDiffLocking", 1.0f);
+    dragCoefficientArea = config.get("Aero", "cda", 0.0f);
+    airDensityValue = config.get("Environment", "airDensity");
+    longEquilibriumEnabled = config.getString("Simlation", "longEquilibrium", "false") == "true";
+    targetLongAcc = config.get("Simlation", "targetLongAcc", 0.0f);
+    tireCalibrationSlip = config.get("Tire", "calibrationSlipAngle", 90.0f) *
+                          config.angleUnitScale("Tire", "calibrationSlipAngle");
+    lateralAccBracketG = config.get("Simlation", "latAccBracketG", 4.0f);
 }
 
 template <typename Frame>
@@ -100,64 +220,299 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::evaluateAt(Y<Frame> testLatA
     state.angularVelocity.z = Z<Frame>{testLatAcc.v / state.velocity.getLength()};
     auto slipAngles = calculateSlipAngles();
     auto loads = totalTireLoads(testLatAcc, config);
+
     SolverStep step;
+    computeTireForces(loads, slipAngles, step);
+    step.latAcc = calculateLatAcc(step.tireForcesX, step.tireForcesY);
+    longitudinalAccEstimate = calculateBodyLongAcc(step.tireForcesX, step.tireForcesY).v;
+    return step;
+}
+
+template <typename Frame>
+void Vehicle<Frame>::computeTireForces(const WheelData<float>& loads,
+                                       const WheelData<Alpha<Frame>>& slipAngles,
+                                       SolverStep& step) {
+    WheelData<float> slipRatio{};
+    if (longEquilibriumEnabled && std::abs(longForceDemand) > minSolveForce) {
+        bool driving = longForceDemand > 0;
+        float frontBias = driving ? driveBiasFront : brakeBiasFront;
+        float frontAxle = longForceDemand * frontBias;
+        float rearAxle = longForceDemand * (1.0f - frontBias);
+        bool frontDriven = driveBiasFront > drivenAxleEpsilon;
+        bool rearDriven = (1.0f - driveBiasFront) > drivenAxleEpsilon;
+        solveAxle(0, 1, loads, slipAngles, frontAxle, frontDriven, frontDiffLocking, slipRatio.FL,
+                  slipRatio.FR);
+        solveAxle(2, 3, loads, slipAngles, rearAxle, rearDriven, rearDiffLocking, slipRatio.RL,
+                  slipRatio.RR);
+    }
+
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tires[i].value->calculate(loads[i], slipAngles[i], 0, camber[i]);
+        tires[i].value->calculate(loads[i], slipAngles[i], slipRatio[i], camber[i]);
         step.tireForcesX[i] = tires[i].value->getForce().value.x;
         step.tireForcesY[i] = tires[i].value->getForce().value.y;
         step.tireMomentsZ[i] = tires[i].value->getTorque().z;
     }
-    step.latAcc = calculateLatAcc(step.tireForcesX, step.tireForcesY);
+}
+
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectLatAcc(const Config& config,
+                                                                 float maxLatAcc, float tolerance,
+                                                                 int maxIterations) {
+    float frozenLongAcc = longitudinalAccEstimate;
+    float frozenDemand = longForceDemand;
+    auto residualAt = [&](float testLatAcc) {
+        longitudinalAccEstimate = frozenLongAcc;
+        longForceDemand = frozenDemand;
+        return evaluateAt(Y<Frame>{testLatAcc}, config).latAcc.v - testLatAcc;
+    };
+
+    float root = bracketedRoot(residualAt, 0.0f, -maxLatAcc, maxLatAcc, maxLatAcc, tolerance,
+                               maxIterations);
+    SolverStep step;
+    if (std::isnan(root)) {
+        step = evaluateAt(Y<Frame>{0}, config);
+        step.latAcc = Y<Frame>{root};
+        return step;
+    }
+    longitudinalAccEstimate = frozenLongAcc;
+    longForceDemand = frozenDemand;
+    step = evaluateAt(Y<Frame>{root}, config);
+    step.latAcc = Y<Frame>{root};
+    return step;
+}
+
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectDemand(const Config& config,
+                                                                 float maxForce, float maxLatAcc,
+                                                                 float tolerance, int maxIterations) {
+    float frozenLongAcc = longitudinalAccEstimate;
+    SolverStep step;
+    auto longResidualAt = [&](float testDemand) {
+        longitudinalAccEstimate = frozenLongAcc;
+        longForceDemand = testDemand;
+        step = bisectLatAcc(config, maxLatAcc, tolerance, maxIterations);
+        return targetLongAcc - calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v;
+    };
+
+    float demandTolerance = combinedTotalMass.value * tolerance;
+    float root = bracketedRoot(longResidualAt, 0.0f, -maxForce, maxForce, maxForce,
+                               demandTolerance, maxIterations);
+    if (std::isnan(root)) {
+        float rLo = longResidualAt(-maxForce);
+        float rHi = longResidualAt(maxForce);
+        if (std::abs(rLo) < std::abs(rHi)) {
+            longResidualAt(-maxForce);
+        } else {
+            longResidualAt(maxForce);
+        }
+        return step;
+    }
+    longResidualAt(root);
+    return step;
+}
+
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& config,
+                                                                 float tolerance,
+                                                                 int maxIterations) {
+    float earthAcc = config.get("Environment", "earthAcc");
+    float maxForce = combinedTotalMass.value * earthAcc * 2.0f;
+    float maxLatAcc = lateralAccBracketG * earthAcc;
+
+    longitudinalAccEstimate = 0;
+
+    SolverStep step;
+    for (int outer = 0; outer < longitudinalRelaxIterations; outer++) {
+        float frozenLongAcc = longitudinalAccEstimate;
+
+        auto residuals = [&](float latAcc, float demand, float& latResidual, float& longResidual) {
+            longitudinalAccEstimate = frozenLongAcc;
+            longForceDemand = demand;
+            step = evaluateAt(Y<Frame>{latAcc}, config);
+            latResidual = step.latAcc.v - latAcc;
+            longResidual =
+                calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v - targetLongAcc;
+        };
+
+        float latAcc = 0;
+        float demand = 0;
+        float epsLat = newtonStepScale * tolerance;
+        float epsDemand = newtonStepScale * combinedTotalMass.value * tolerance;
+        bool converged = false;
+        for (int iter = 0; iter < newtonIterations; iter++) {
+            float r1, r2;
+            residuals(latAcc, demand, r1, r2);
+            if (std::abs(r1) < tolerance && std::abs(r2) < tolerance) {
+                converged = true;
+                break;
+            }
+            float r1Lat, r2Lat, r1Demand, r2Demand;
+            residuals(latAcc + epsLat, demand, r1Lat, r2Lat);
+            residuals(latAcc, demand + epsDemand, r1Demand, r2Demand);
+            float j11 = (r1Lat - r1) / epsLat, j12 = (r1Demand - r1) / epsDemand;
+            float j21 = (r2Lat - r2) / epsLat, j22 = (r2Demand - r2) / epsDemand;
+            float det = j11 * j22 - j12 * j21;
+            if (std::abs(det) < newtonSingularJacobianEpsilon) break;
+            latAcc -= (j22 * r1 - j12 * r2) / det;
+            demand -= (j11 * r2 - j21 * r1) / det;
+            if (std::abs(latAcc) > maxLatAcc || std::abs(demand) > maxForce) break;
+        }
+
+        if (converged) {
+            float r1, r2;
+            residuals(latAcc, demand, r1, r2);
+        } else {
+            longitudinalAccEstimate = frozenLongAcc;
+            step = bisectDemand(config, maxForce, maxLatAcc, tolerance, maxIterations);
+        }
+
+        float bodyLongAcc = calculateBodyLongAcc(step.tireForcesX, step.tireForcesY).v;
+        longitudinalAccEstimate = frozenLongAcc + 0.5f * (bodyLongAcc - frozenLongAcc);
+        if (std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance) break;
+    }
+
+    return step;
+}
+
+template <typename Frame>
+float Vehicle<Frame>::slipRatioForForce(size_t wheel, float load, Alpha<Frame> slipAngle,
+                                        Gamma<Frame> camber, float targetFx) {
+    if (load < minWheelLoad || std::abs(targetFx) < minSolveForce) return 0;
+
+    auto forceAt = [&](float slipRatio) {
+        tires[wheel].value->calculate(load, slipAngle, slipRatio, camber);
+        return tires[wheel].value->getForce().value.x.v;
+    };
+    return ascendingBranchSlipRatio(forceAt, targetFx);
+}
+
+template <typename Frame>
+float Vehicle<Frame>::wheelLongSpeed(size_t wheel) {
+    float x = tires[wheel].position.x.v;
+    float y = tires[wheel].position.y.v;
+    float yawRate = state.angularVelocity.z.v;
+    float contactX = state.velocity.x.v - yawRate * y;
+    float contactY = state.velocity.y.v + yawRate * x;
+    float heading = state.wheelAngles[wheel].v;
+    return contactX * std::cos(heading) + contactY * std::sin(heading);
+}
+
+template <typename Frame>
+void Vehicle<Frame>::solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
+                               const WheelData<Alpha<Frame>>& slipAngles, float axleDemand,
+                               bool hasDiff, float locking, float& leftSlipRatio,
+                               float& rightSlipRatio) {
+    float openForce = axleDemand * 0.5f;
+    float leftOpen = slipRatioForForce(leftWheel, loads[leftWheel], slipAngles[leftWheel],
+                                       camber[leftWheel], openForce);
+    float rightOpen = slipRatioForForce(rightWheel, loads[rightWheel], slipAngles[rightWheel],
+                                        camber[rightWheel], openForce);
+
+    float leftSpeed = wheelLongSpeed(leftWheel);
+    float rightSpeed = wheelLongSpeed(rightWheel);
+    if (!hasDiff || leftSpeed < minWheelSpeed || rightSpeed < minWheelSpeed) {
+        leftSlipRatio = leftOpen;
+        rightSlipRatio = rightOpen;
+        return;
+    }
+
+    float refSpeed = 0.5f * (leftSpeed + rightSpeed);
+    auto clampRatio = [](float ratio) {
+        return std::max(-slipRatioClamp, std::min(slipRatioClamp, ratio));
+    };
+    auto axleForceAt = [&](float meanSlip) {
+        float surfaceSpeed = refSpeed * (1.0f + meanSlip);
+        float leftRatio = clampRatio(surfaceSpeed / leftSpeed - 1.0f);
+        float rightRatio = clampRatio(surfaceSpeed / rightSpeed - 1.0f);
+        tires[leftWheel].value->calculate(loads[leftWheel], slipAngles[leftWheel], leftRatio,
+                                          camber[leftWheel]);
+        float leftForce = tires[leftWheel].value->getForce().value.x.v;
+        tires[rightWheel].value->calculate(loads[rightWheel], slipAngles[rightWheel], rightRatio,
+                                           camber[rightWheel]);
+        float rightForce = tires[rightWheel].value->getForce().value.x.v;
+        return leftForce + rightForce;
+    };
+    float meanSlip = ascendingBranchSlipRatio(axleForceAt, axleDemand);
+    float surfaceSpeed = refSpeed * (1.0f + meanSlip);
+    float lockedLeft = clampRatio(surfaceSpeed / leftSpeed - 1.0f);
+    float lockedRight = clampRatio(surfaceSpeed / rightSpeed - 1.0f);
+
+    leftSlipRatio = (1.0f - locking) * leftOpen + locking * lockedLeft;
+    rightSlipRatio = (1.0f - locking) * rightOpen + locking * lockedRight;
+}
+
+template <typename Frame>
+X<Frame> Vehicle<Frame>::calculatePathLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                                              const WheelData<Y<Frame>>& tireForcesY) {
+    auto vehicleFx = getVehicleFxFromTireForces(tireForcesX, tireForcesY);
+    auto vehicleFy = getVehicleFyFromTireForces(tireForcesX, tireForcesY);
+    float chassisSlipAngle = std::atan2(state.velocity.y.v, state.velocity.x.v);
+
+    float velocity = state.velocity.getLength();
+    float drag = 0.5f * dragCoefficientArea * airDensityValue * velocity * velocity;
+
+    float longForce = -drag;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        longForce += vehicleFx[i].v * std::cos(chassisSlipAngle) +
+                     vehicleFy[i].v * std::sin(chassisSlipAngle);
+    }
+    return X<Frame>{longForce / combinedTotalMass.value};
+}
+
+template <typename Frame>
+X<Frame> Vehicle<Frame>::calculateBodyLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                                              const WheelData<Y<Frame>>& tireForcesY) {
+    auto vehicleFx = getVehicleFxFromTireForces(tireForcesX, tireForcesY);
+    float chassisSlipAngle = std::atan2(state.velocity.y.v, state.velocity.x.v);
+    float velocity = state.velocity.getLength();
+    float drag = 0.5f * dragCoefficientArea * airDensityValue * velocity * velocity;
+
+    float longForce = -drag * std::cos(chassisSlipAngle);
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        longForce += vehicleFx[i].v;
+    }
+    return X<Frame>{longForce / combinedTotalMass.value};
+}
+
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveLatAcc(const Config& config,
+                                                                float tolerance,
+                                                                int maxIterations) {
+    longitudinalAccEstimate = 0;
+    longForceDemand = 0;
+    float maxLatAcc = lateralAccBracketG * config.get("Environment", "earthAcc");
+
+    SolverStep step;
+    for (int outer = 0; outer < maxIterations; outer++) {
+        float frozenLongAcc = longitudinalAccEstimate;
+        step = bisectLatAcc(config, maxLatAcc, tolerance, maxIterations);
+        if (std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance) break;
+    }
+
     return step;
 }
 
 template <typename Frame>
 std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance, int maxIterations,
                                                                  const Config& config) {
-    Y<Frame> latAcc{0};
-    Y<Frame> prevLatAcc{0};
-    float residual = 0;
-    float prevResidual = 0;
-    int iterations = 0;
-    bool oscillating = false;
-
-    state.angularVelocity.setLength(0);
-
     SolverStep step;
-    do {
-        iterations++;
-        step = evaluateAt(latAcc, config);
-        prevResidual = residual;
-        residual = step.latAcc.v - latAcc.v;
+    if (longEquilibriumEnabled) {
+        step = solveCoupled(config, tolerance, maxIterations);
+    } else {
+        longForceDemand = 0;
+        step = solveLatAcc(config, tolerance, maxIterations);
+    }
+    Y<Frame> latAcc = step.latAcc;
 
-        if (iterations >= 2 && (residual > 0) != (prevResidual > 0)) {
-            oscillating = true;
-            break;
-        }
-
-        prevLatAcc = latAcc;
-        latAcc = step.latAcc;
-    } while (std::abs(residual) > tolerance && iterations < maxIterations);
-
-    if (oscillating) {
-        Y<Frame> latAccLo{std::min(prevLatAcc.v, latAcc.v)};
-        Y<Frame> latAccHi{std::max(prevLatAcc.v, latAcc.v)};
-        float residualLo = (prevLatAcc.v < latAcc.v) ? prevResidual : residual;
-        Y<Frame> latAccMid;
-
-        for (int i = 0; i < maxIterations && latAccHi.v - latAccLo.v > tolerance; i++) {
-            latAccMid.v = (latAccLo.v + latAccHi.v) * 0.5f;
-            step = evaluateAt(latAccMid, config);
-            float residualMid = step.latAcc.v - latAccMid.v;
-            if ((residualMid > 0) == (residualLo > 0)) {
-                latAccLo = latAccMid;
-                residualLo = residualMid;
-            } else {
-                latAccHi = latAccMid;
-            }
-        }
-
-        latAcc = latAccMid;
+    state.angularVelocity.z = Z<Frame>{latAcc.v / state.velocity.getLength()};
+    auto solutionSlipAngles = calculateSlipAngles();
+    float maxSlip = 0;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        maxSlip = std::max(maxSlip, std::abs(solutionSlipAngles[i].v));
+    }
+    if (maxSlip > tireCalibrationSlip) {
+        float nan = std::numeric_limits<float>::quiet_NaN();
+        return {nan, nan};
     }
 
     float yawMomentFromTires = 0;
@@ -302,15 +657,28 @@ WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc, const Config& c
     auto staticLoads = staticLoad(earthAcc);
     auto aeroLoads = aeroLoad(config);
     auto transfer = loadTransfer(latAcc);
+    auto longTransfer = loadTransferLongitudinal(longitudinalAccEstimate);
     WheelData<float> tireLoads;
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
-        tireLoads[i] = staticLoads[i] + aeroLoads[i] + transfer[i];
+        tireLoads[i] = staticLoads[i] + aeroLoads[i] + transfer[i] + longTransfer[i];
     }
 
     resolveAxleLiftOff(tireLoads.FL, tireLoads.FR);
     resolveAxleLiftOff(tireLoads.RL, tireLoads.RR);
 
     return tireLoads;
+}
+
+template <typename Frame>
+WheelData<float> Vehicle<Frame>::loadTransferLongitudinal(float longAcc) {
+    float transfer =
+        combinedTotalMass.value * longAcc * combinedTotalMass.position.z.v / trackDistance;
+    WheelData<float> loads;
+    loads.FL = -transfer * 0.5f;
+    loads.FR = -transfer * 0.5f;
+    loads.RL = transfer * 0.5f;
+    loads.RR = transfer * 0.5f;
+    return loads;
 }
 
 template <typename Frame>

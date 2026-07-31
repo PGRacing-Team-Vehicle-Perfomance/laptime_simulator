@@ -28,33 +28,38 @@ def read_csv(path):
                 "slip": float(row["slip"]),
                 "latAcc": float(row["latAcc"]),
                 "yawMoment": float(row["yawMoment"]),
+                "baseSteering": float(row.get("baseSteering", 1.0)) > 0.5,
+                "baseSlip": float(row.get("baseSlip", 1.0)) > 0.5,
             }
-            if all(math.isfinite(v) for v in point.values()):
+            if math.isfinite(point["latAcc"]) and math.isfinite(point["yawMoment"]):
                 data.append(point)
     return data
 
 
+FAMILY_FLAG = {"steering": "baseSteering", "slip": "baseSlip"}
+
+
 def group_by(data, key):
+    flag = FAMILY_FLAG.get(key)
     grouped = defaultdict(list)
     for point in data:
-        grouped[point[key]].append(point)
+        if flag is None or point.get(flag, True):
+            grouped[point[key]].append(point)
     return grouped
 
 
 def plot_steering_isolines(ax, by_steering, color):
     for steering_angle in sorted(by_steering.keys()):
         points = sorted(by_steering[steering_angle], key=lambda p: p["slip"])
-        x = [p["latAcc"] for p in points]
-        y = [p["yawMoment"] for p in points]
-        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
+        ax.plot([p["latAcc"] for p in points], [p["yawMoment"] for p in points],
+                color=color, alpha=0.6, linewidth=0.8)
 
 
 def plot_slip_isolines(ax, by_slip, color):
     for slip_angle in sorted(by_slip.keys()):
         points = sorted(by_slip[slip_angle], key=lambda p: p["steering"])
-        x = [p["latAcc"] for p in points]
-        y = [p["yawMoment"] for p in points]
-        ax.plot(x, y, color=color, alpha=0.6, linewidth=0.8)
+        ax.plot([p["latAcc"] for p in points], [p["yawMoment"] for p in points],
+                color=color, alpha=0.6, linewidth=0.8)
 
 
 def style_axes(ax, title):
