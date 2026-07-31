@@ -14,6 +14,7 @@ class AeroSimple : public AeroBase<External> {
     Force<Internal> internalForce;
 
     float cla = 0;
+    float cda = 0;
 
     void calculateInternal(float airDensity, float speed);
 
