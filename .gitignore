@@ -4,3 +4,5 @@ build
 out
 .cache
 .venv
+results
+__pycache__

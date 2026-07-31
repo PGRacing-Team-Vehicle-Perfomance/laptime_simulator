@@ -1,11 +1,12 @@
-.PHONY: all build debug run plot rebuild clean help venv
+.PHONY: all build debug run plot setups setups-help setups-axle-params rebuild clean help venv
 
 BUILD_DIR := build
 BUILD_TYPE ?= Release
 EXECUTABLE := $(BUILD_DIR)/laptime_simulator
 VENV_DIR := .venv
 PYTHON := $(VENV_DIR)/bin/python
-CONFIG ?= 
+CONFIG ?=
+SETUP_ARGS ?= --config config_pacejka_v2.csv --param toe
 
 all: build
 
@@ -32,11 +33,21 @@ $(VENV_DIR)/bin/activate:
 	@echo "=== Creating virtual environment ==="
 	@python3 -m venv $(VENV_DIR)
 	@$(PYTHON) -m pip install --upgrade pip
-	@$(PYTHON) -m pip install matplotlib
+	@$(PYTHON) -m pip install matplotlib numpy
 
 plot: run venv
 	@echo "=== Generating plot ==="
 	@$(PYTHON) tools/plot_yaw_diagram.py $(BUILD_DIR)/yaw_diagram.csv
+
+setups: build venv
+	@echo "=== Generating setup matrix ==="
+	@$(PYTHON) tools/generate_setups.py --binary $(EXECUTABLE) $(SETUP_ARGS)
+
+setups-help: venv
+	@$(PYTHON) tools/generate_setups.py --help
+
+setups-axle-params: venv
+	@$(PYTHON) tools/generate_setups.py --list-axle-params $(SETUP_ARGS)
 
 rebuild: clean build
 
@@ -53,6 +64,9 @@ help:
 	@echo "  debug    Build Debug"
 	@echo "  run      Run"
 	@echo "  plot     Run and generate plot"
+	@echo "  setups        Generate a setup-sweep matrix of diagrams"
+	@echo "  setups-help   Show all setup-sweep options and examples"
+	@echo "  setups-axle-params List the front/rear pair params usable with --param/--axle"
 	@echo "  venv     Create Python virtual environment"
 	@echo "  rebuild  Clean and rebuild"
 	@echo "  clean    Remove build directory"
@@ -63,3 +77,5 @@ help:
 	@echo "  make debug"
 	@echo "  make run CONFIG=config_pacejka_v1.csv"
 	@echo "  make plot CONFIG=config_simple.csv"
+	@echo "  make setups"
+	@echo "  make setups SETUP_ARGS=\"--config config_pacejka_v2.csv --param Vehicle.frontKarb --percent 20\""
