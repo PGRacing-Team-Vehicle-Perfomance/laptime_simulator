@@ -89,7 +89,6 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
     int maxIterations) {
     v.setSpeed(speed);
 
-    using Continuity = typename Vehicle<Frame>::Continuity;
     struct Sample {
         float steering;
         float slip;
@@ -97,50 +96,27 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
         float yawMoment;
         bool inSteeringFamily;
         bool inSlipFamily;
-        Continuity cont;
     };
 
-    auto solveAt = [&](float steering, float slip, const Continuity& seed, bool inSteer,
-                       bool inSlip) {
+    auto solveAt = [&](float steering, float slip, bool inSteer, bool inSlip) {
         v.setSteeringAngle(Alpha<Frame>(steering * M_PI / 180.f));
-        v.continuity(seed);
         v.setChassisSlipAngle(Alpha<Frame>(slip * M_PI / 180.f));
         std::array<float, 2> point = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
-        return Sample{steering, slip, point[0], point[1], inSteer, inSlip, v.continuity()};
+        return Sample{steering, slip, point[0], point[1], inSteer, inSlip};
     };
 
     std::vector<std::pair<float, std::vector<Sample>>> isolines;
-    auto sweepSteering = [&](float steeringAngle, const Continuity& slipZeroSeed) {
+    auto sweepSteering = [&](float steeringAngle) {
         std::vector<Sample> samples;
-        Sample zero = solveAt(steeringAngle, 0.0f, slipZeroSeed, true, true);
-        samples.push_back(zero);
-        Continuity accepted = zero.cont;
-        for (float slip = slipAngleStep; slip <= maxSlipAngle; slip += slipAngleStep) {
-            samples.push_back(solveAt(steeringAngle, slip, accepted, true, true));
-            accepted = samples.back().cont;
+        for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
+            samples.push_back(solveAt(steeringAngle, slip, true, true));
         }
-        accepted = zero.cont;
-        for (float slip = -slipAngleStep; slip >= -maxSlipAngle; slip -= slipAngleStep) {
-            samples.push_back(solveAt(steeringAngle, slip, accepted, true, true));
-            accepted = samples.back().cont;
-        }
-        std::sort(samples.begin(), samples.end(),
-                  [](const Sample& a, const Sample& b) { return a.slip < b.slip; });
         isolines.push_back({steeringAngle, std::move(samples)});
-        return zero.cont;
     };
 
-    v.resetContinuity();
-    Continuity originSeed = v.continuity();
-    Continuity seed = originSeed;
-    for (float steeringAngle = 0; steeringAngle <= maxSteeringAngle;
+    for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
          steeringAngle += steeringAngleStep) {
-        seed = sweepSteering(steeringAngle, seed);
-    }
-    seed = originSeed;
-    for (float steeringAngle = -steeringAngleStep; steeringAngle >= -maxSteeringAngle;
-         steeringAngle -= steeringAngleStep) {
-        seed = sweepSteering(steeringAngle, seed);
+        sweepSteering(steeringAngle);
     }
 
     std::vector<Sample> steeringRefined;
@@ -202,7 +178,7 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
 
         std::function<Sample(const Sample&, const Sample&)> slipMid = [&](const Sample& l,
                                                                           const Sample& r) {
-            return solveAt(l.steering, 0.5f * (l.slip + r.slip), l.cont, true, false);
+            return solveAt(l.steering, 0.5f * (l.slip + r.slip), true, false);
         };
         for (auto& [steering, samples] : isolines) {
             std::vector<Sample> refined{samples[0]};
@@ -215,7 +191,7 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
 
         std::function<Sample(const Sample&, const Sample&)> steeringMid = [&](const Sample& l,
                                                                               const Sample& r) {
-            return solveAt(0.5f * (l.steering + r.steering), l.slip, l.cont, false, true);
+            return solveAt(0.5f * (l.steering + r.steering), l.slip, false, true);
         };
         for (auto& [key, group] : baseBySlip) {
             for (size_t i = 1; i < group.size(); i++) {

@@ -48,8 +48,6 @@ class Vehicle {
     float tireCalibrationSlip = 0;
     float lateralAccBracketG = 4;
 
-    float lastDemand = 0;
-    float lastLongAcc = 0;
     float longitudinalAccEstimate = 0;
 
     VehicleState<Frame> state;
@@ -82,6 +80,8 @@ class Vehicle {
                    const WheelData<Alpha<Frame>>& slipAngles, float axleDemand, bool hasDiff,
                    float locking, float& leftSlipRatio, float& rightSlipRatio);
     SolverStep bisectLatAcc(const Config& config, float maxLatAcc, float tolerance,
+                            int maxIterations);
+    SolverStep bisectDemand(const Config& config, float maxForce, float maxLatAcc, float tolerance,
                             int maxIterations);
     SolverStep solveLatAcc(const Config& config, float tolerance, int maxIterations);
     SolverStep solveCoupled(const Config& config, float tolerance, int maxIterations);

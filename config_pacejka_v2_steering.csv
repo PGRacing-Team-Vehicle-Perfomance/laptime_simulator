@@ -178,3 +178,6 @@ Simlation,maxIterations,100
 Simlation,latAccBracketG,4
 Simlation,longEquilibrium,false
 Simlation,targetLongAcc,0.0
+Simlation,refine,1
+Simlation,refineFactor,1.5
+Simlation,refineMaxDepth,4
