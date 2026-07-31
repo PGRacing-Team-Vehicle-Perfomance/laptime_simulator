@@ -45,12 +45,12 @@ class Vehicle {
     bool longEquilibriumEnabled = false;
     float targetLongAcc = 0;
     float longForceDemand = 0;
+    float tireCalibrationSlip = 0;
+    float lateralAccBracketG = 4;
 
-    float lastLatAcc = 0;
     float lastDemand = 0;
     float lastLongAcc = 0;
     float longitudinalAccEstimate = 0;
-    WheelData<float> lastKappa{};
 
     VehicleState<Frame> state;
 
@@ -71,8 +71,8 @@ class Vehicle {
     WheelData<float> staticLoad(float earthAcc);
     Y<Frame> calculateLatAcc(const WheelData<X<Frame>>& tireForcesX,
                              const WheelData<Y<Frame>>& tireForcesY);
-    X<Frame> calculateLongAcc(const WheelData<X<Frame>>& tireForcesX,
-                              const WheelData<Y<Frame>>& tireForcesY);
+    X<Frame> calculatePathLongAcc(const WheelData<X<Frame>>& tireForcesX,
+                                  const WheelData<Y<Frame>>& tireForcesY);
     X<Frame> calculateBodyLongAcc(const WheelData<X<Frame>>& tireForcesX,
                                   const WheelData<Y<Frame>>& tireForcesY);
     float slipRatioForForce(size_t wheel, float load, Alpha<Frame> slipAngle, Gamma<Frame> camber,
@@ -81,6 +81,8 @@ class Vehicle {
     void solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
                    const WheelData<Alpha<Frame>>& slipAngles, float axleDemand, bool hasDiff,
                    float locking, float& leftSlipRatio, float& rightSlipRatio);
+    SolverStep bisectLatAcc(const Config& config, float maxLatAcc, float tolerance,
+                            int maxIterations);
     SolverStep solveLatAcc(const Config& config, float tolerance, int maxIterations);
     SolverStep solveCoupled(const Config& config, float tolerance, int maxIterations);
     void computeTireForces(const WheelData<float>& loads, const WheelData<Alpha<Frame>>& slipAngles,
@@ -105,19 +107,9 @@ class Vehicle {
             Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
             std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable);
 
-    struct Continuity {
-        float latAcc;
-        float demand;
-        float longAcc;
-        WheelData<float> kappa;
-    };
-
     void setChassisSlipAngle(Alpha<Frame> chassisSlipAngle);
     void setSteeringAngle(Alpha<Frame> steeringAngle);
     void setSpeed(float speed);
-    void resetContinuity();
-    Continuity continuity() const;
-    void continuity(const Continuity& snapshot);
 
     std::array<float, 2> calculateLatAccAndYawMoment(float tolerance, int maxIterations,
                                                      const Config& config);
