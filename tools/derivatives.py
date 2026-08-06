@@ -47,13 +47,22 @@ def compute_derivatives(data):
         control.update(line_derivative(slip_points, "steering"))
 
     for point in data:
-        point[STABILITY_KEY] = stability[id(point)]
-        point[CONTROL_KEY] = control[id(point)]
+        point[STABILITY_KEY] = stability.get(id(point))
+        point[CONTROL_KEY] = control.get(id(point))
     return data
+
+
+def points_with_value(data, key):
+    return [p for p in data if p.get(key) is not None]
+
+
+def on_base_grid(p):
+    return bool(p.get("baseSteering", True) and p.get("baseSlip", True))
 
 
 def robust_limit(values):
     values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
     if values.size == 0:
         return 1.0
     return float(np.percentile(np.abs(values), 98)) or float(np.abs(values).max())
@@ -102,6 +111,7 @@ def rasterize_field(lat, mz, values):
 
 
 def render_derivative_field(data, value_key, cbar_label, title, subtitle):
+    data = points_with_value(data, value_key)
     lat = np.array([p["latAcc"] for p in data])
     mz = np.array([p["yawMoment"] for p in data])
     values = np.array([p[value_key] for p in data])
@@ -126,6 +136,7 @@ def render_derivative_field(data, value_key, cbar_label, title, subtitle):
 
 
 def grid_matrix(data, value_key):
+    data = [p for p in data if p.get(value_key) is not None and on_base_grid(p)]
     steering_axis = sorted({p["steering"] for p in data})
     slip_axis = sorted({p["slip"] for p in data})
     steering_index = {v: i for i, v in enumerate(steering_axis)}
@@ -137,6 +148,7 @@ def grid_matrix(data, value_key):
 
 
 def draw_field(ax, data, value_key, norm):
+    data = points_with_value(data, value_key)
     lat = np.array([p["latAcc"] for p in data])
     mz = np.array([p["yawMoment"] for p in data])
     values = np.array([p[value_key] for p in data])
@@ -199,10 +211,18 @@ def render_derivative_figures(data, title_prefix=""):
     }
 
 
-ENRICHED_COLUMNS = ["steering", "slip", "latAcc", "yawMoment", CONTROL_KEY, STABILITY_KEY]
+FLAG_COLUMNS = ("baseSteering", "baseSlip")
+ENRICHED_COLUMNS = ["steering", "slip", "latAcc", "yawMoment", CONTROL_KEY, STABILITY_KEY,
+                    *FLAG_COLUMNS]
 
 CONTROL_DIFF_KEY = "d_control_vs_base"
 STABILITY_DIFF_KEY = "d_stability_vs_base"
+
+
+def enriched_cell(point, column):
+    if column in FLAG_COLUMNS:
+        return int(bool(point.get(column, True)))
+    return point.get(column)
 
 
 def write_enriched_csv(path, data):
@@ -210,7 +230,14 @@ def write_enriched_csv(path, data):
         writer = csv.writer(f)
         writer.writerow(ENRICHED_COLUMNS)
         for point in data:
-            writer.writerow([point[column] for column in ENRICHED_COLUMNS])
+            writer.writerow([enriched_cell(point, column) for column in ENRICHED_COLUMNS])
+
+
+def diff_value(point, base_point, key):
+    setup_value, base_value = point.get(key), base_point.get(key)
+    if setup_value is None or base_value is None:
+        return None
+    return setup_value - base_value
 
 
 def build_diff_data(setup_data, base_data):
@@ -226,8 +253,10 @@ def build_diff_data(setup_data, base_data):
                 "slip": point["slip"],
                 "latAcc": base_point["latAcc"],
                 "yawMoment": base_point["yawMoment"],
-                CONTROL_DIFF_KEY: point[CONTROL_KEY] - base_point[CONTROL_KEY],
-                STABILITY_DIFF_KEY: point[STABILITY_KEY] - base_point[STABILITY_KEY],
+                "baseSteering": point.get("baseSteering", True),
+                "baseSlip": point.get("baseSlip", True),
+                CONTROL_DIFF_KEY: diff_value(point, base_point, CONTROL_KEY),
+                STABILITY_DIFF_KEY: diff_value(point, base_point, STABILITY_KEY),
             }
         )
     return diff_data
