@@ -31,11 +31,12 @@ constexpr int forceBisectionIterations = 18;
 
 template <typename ForceFn>
 inline float ascendingBranchSlipRatio(ForceFn forceAt, float target) {
-    if (std::abs(target) < minSolveForce) return 0;
-    float direction = target > 0 ? 1.0f : -1.0f;
+    float zeroForce = forceAt(0.0f);
+    if (std::abs(target - zeroForce) < minSolveForce) return 0;
+    float direction = target > zeroForce ? 1.0f : -1.0f;
 
     float peakSlipRatio = 0;
-    float peakForce = forceAt(0.0f);
+    float peakForce = zeroForce;
     for (int scan = 1; scan <= slipRatioScanSteps; scan++) {
         float slipRatio = direction * slipRatioScanStep * scan;
         float force = forceAt(slipRatio);
