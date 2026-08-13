@@ -229,40 +229,33 @@ app.layout = html.Div(style={'display': 'flex', 'flex-direction': 'row', 'height
 
 def update_car_vectors(hoverData):
     
-    try:
-        if hoverData is None:
-            return create_car_figure(steer=0, slip=0), "Hover over a point on the YMD graph..."
+    if hoverData is None:
+        return create_car_figure(steer=0, slip=0), "Hover over a point on the YMD graph..."
 
-        point_info = hoverData['points'][0]
+    point_info = hoverData['points'][0]
         
-        if 'customdata' not in point_info:
-            return create_car_figure(), html.Div(f"BŁĄD: Brak 'customdata' pod kursorem! Dostępne klucze to: {list(point_info.keys())}", style={'color': 'red'})
-        # Odczytywanie zdefiniowanych kolumn z customdata
-        pt = point_info['customdata']
-        steer, slip = pt[0], pt[1]
+    if 'customdata' not in point_info:
+        return create_car_figure(), html.Div(f"BŁĄD: Brak 'customdata' pod kursorem! Dostępne klucze to: {list(point_info.keys())}", style={'color': 'red'})
+    pt = point_info['customdata']
+    steer, slip = pt[0], pt[1]
         
-        forces = {
-            'FL': [pt[2], pt[3], pt[4]],
-            'FR': [pt[5], pt[6], pt[7]],
-            'RL': [pt[8], pt[9], pt[10]],
-            'RR': [pt[11], pt[12], pt[13]]
-        }
+    forces = {
+        'FL': [pt[2], pt[3], pt[4]],
+        'FR': [pt[5], pt[6], pt[7]],
+        'RL': [pt[8], pt[9], pt[10]],
+        'RR': [pt[11], pt[12], pt[13]]
+    }
 
-        text_info = html.Div([
-            html.H3(f"Parameters: Steer {steer:.1f}°, Slip {slip:.1f}°", style={'margin-top': '0'}),
-            html.Hr(),
-            html.P(f"Front Left (FL): Fx={forces['FL'][0]:.0f} N | Fy={forces['FL'][1]:.0f} N | Load={forces['FL'][2]:.0f} N"),
-            html.P(f"Front Right (FR): Fx={forces['FR'][0]:.0f} N | Fy={forces['FR'][1]:.0f} N | Load={forces['FR'][2]:.0f} N"),
-            html.P(f"Rear Left (RL): Fx={forces['RL'][0]:.0f} N | Fy={forces['RL'][1]:.0f} N | Load={forces['RL'][2]:.0f} N"),
-            html.P(f"Rear Right (RR): Fx={forces['RR'][0]:.0f} N | Fy={forces['RR'][1]:.0f} N | Load={forces['RR'][2]:.0f} N"),
-        ])
+    text_info = html.Div([
+        html.H3(f"Parameters: Steer {steer:.1f}°, Slip {slip:.1f}°", style={'margin-top': '0'}),
+        html.Hr(),
+        html.P(f"Front Left (FL): Fx={forces['FL'][0]:.0f} N | Fy={forces['FL'][1]:.0f} N | Load={forces['FL'][2]:.0f} N"),
+        html.P(f"Front Right (FR): Fx={forces['FR'][0]:.0f} N | Fy={forces['FR'][1]:.0f} N | Load={forces['FR'][2]:.0f} N"),
+        html.P(f"Rear Left (RL): Fx={forces['RL'][0]:.0f} N | Fy={forces['RL'][1]:.0f} N | Load={forces['RL'][2]:.0f} N"),
+        html.P(f"Rear Right (RR): Fx={forces['RR'][0]:.0f} N | Fy={forces['RR'][1]:.0f} N | Load={forces['RR'][2]:.0f} N"),
+    ])
 
-        return create_car_figure(forces, steer, slip), text_info
-
-    except Exception as e:
-        # TWARDE PRZECHWYCENIE BŁĘDU I WYSWIETLENIE GO NA EKRANIE (ZAMIAST UKRYWANIA)
-        err_msg = traceback.format_exc()
-        return create_car_figure(), html.Pre(f"KRYTYCZNY BŁĄD DASH:\n{err_msg}", style={'color': 'red'})
+    return create_car_figure(forces, steer, slip), text_info
 
 if __name__ == '__main__':
     app.run(debug=True)
