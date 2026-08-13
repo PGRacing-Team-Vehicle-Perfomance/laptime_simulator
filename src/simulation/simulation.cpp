@@ -166,14 +166,17 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
         float target = cfg.get("Simlation", "refineFactor", 1.5f) * median;
         int maxDepth = (int)cfg.get("Simlation", "refineMaxDepth", 4.0f);
 
-        auto bisect = [&](this auto&& self, const Sample& left, const Sample& right, int depth,
-                          const std::function<Sample(const Sample&, const Sample&)>& solveMid,
-                          std::vector<Sample>& into) -> void {
+        std::function<void(const Sample&, const Sample&, int,
+                           const std::function<Sample(const Sample&, const Sample&)>&,
+                           std::vector<Sample>&)>
+            bisect = [&](const Sample& left, const Sample& right, int depth,
+                         const std::function<Sample(const Sample&, const Sample&)>& solveMid,
+                         std::vector<Sample>& into) -> void {
             if (depth <= 0 || distance(left, right) <= target) return;
             Sample mid = solveMid(left, right);
-            self(left, mid, depth - 1, solveMid, into);
+            bisect(left, mid, depth - 1, solveMid, into);
             into.push_back(mid);
-            self(mid, right, depth - 1, solveMid, into);
+            bisect(mid, right, depth - 1, solveMid, into);
         };
 
         std::function<Sample(const Sample&, const Sample&)> slipMid = [&](const Sample& l,
