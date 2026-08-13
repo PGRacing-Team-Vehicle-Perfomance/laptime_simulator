@@ -8,10 +8,10 @@ import numpy as np
 import os
 
 # ==========================================
-# 1. WCZYTANIE DANYCH I GENEROWANIE MOCKÓW
+# 1. WCZYTANIE DANYCH
 # ==========================================
 script_dir = os.path.dirname(__file__)
-csv_path = os.path.abspath(os.path.join(script_dir, "..", "build", "yaw_diagram_test.csv"))
+csv_path = os.path.abspath(os.path.join(script_dir, "..", "build", "yaw_diagram.csv"))
 
 if os.path.exists(csv_path):
     df = pd.read_csv(csv_path)
@@ -19,7 +19,7 @@ if os.path.exists(csv_path):
     print(f"Wczytano plik: {csv_path}")
 else:
     print(f"File not found: {csv_path}.")
-    df = pd.DataFrame() # Zabezpieczenie
+    df = pd.DataFrame()
 
 customdata_cols = ['steering', 'slip']
 wheels = ['FL', 'FR', 'RL', 'RR']
@@ -48,7 +48,6 @@ def create_ymd_figure(data):
             name=f'Steer: {steer_val:.2f}°',
             legendgroup='steering',
             showlegend=True if i == 0 else False,
-            # Przekazujemy wszystkie kolumny sił!
             customdata=sorted_group[customdata_cols].values.tolist(),
             hovertemplate=(
                 "<b>[Constant Steering]</b><br>" +
@@ -109,13 +108,13 @@ def create_car_figure(forces=None, steer=0, slip=0):
         cos_t, sin_t = np.cos(theta), np.sin(theta)
         return x * cos_t - y * sin_t, x * sin_t + y * cos_t
 
-    # --- Chassis ---
+    # --- Chassis --- #
     chassis_x = [-car_w, car_w, car_w, -car_w, -car_w]
     chassis_y = [car_l_f, car_l_f, -car_l_r, -car_l_r, car_l_f]
     
     rot_chassis_x, rot_chassis_y = [], []
     for cx, cy in zip(chassis_x, chassis_y):
-        rx, ry = rotate(cx, cy, slip)  # Chassis rotates only by slip
+        rx, ry = rotate(cx, cy, slip)
         rot_chassis_x.append(rx)
         rot_chassis_y.append(ry)
 
@@ -133,16 +132,13 @@ def create_car_figure(forces=None, steer=0, slip=0):
     }
 
     for name, (cx, cy, w_angle) in wheel_data.items():
-        # Środek koła obraca się tylko o slip
         rot_cx, rot_cy = rotate(cx, cy, slip)
         
-        # Punkty lokalne kół
         wx = [-wheel_w, wheel_w, wheel_w, -wheel_w, -wheel_w]
         wy = [wheel_l, wheel_l, -wheel_l, -wheel_l, wheel_l]
         
         rot_wx, rot_wy = [], []
         for x, y in zip(wx, wy):
-            # Same koła obracają się o slip + steer
             rx, ry = rotate(x, y, w_angle)
             rot_wx.append(rx + rot_cx)
             rot_wy.append(ry + rot_cy)
