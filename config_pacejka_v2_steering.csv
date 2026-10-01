@@ -42,8 +42,7 @@ Vehicle,camber.RL,0
 Vehicle,camber.RR,0
 Vehicle,driveBiasFront,0.0
 Vehicle,brakeBiasFront,0.6
-Vehicle,frontDiffLocking,1.0
-Vehicle,rearDiffLocking,1.0
+Differential,implementation,Open
 Vehicle,steeringTable.unit,deg
 Vehicle,steeringTable.frame,ISO8855
 Vehicle,steeringTable.symmetry,0

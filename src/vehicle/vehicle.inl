@@ -11,6 +11,7 @@
 #include "config/config.h"
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
+#include "vehicle/slipSolve.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
@@ -18,70 +19,6 @@ constexpr int longitudinalRelaxIterations = 8;
 constexpr int newtonIterations = 12;
 constexpr float newtonStepScale = 10.0f;
 constexpr float newtonSingularJacobianEpsilon = 1e-6f;
-constexpr float minSolveForce = 0.5f;
-constexpr float minWheelLoad = 1.0f;
-constexpr float minWheelSpeed = 1.0f;
-constexpr float slipRatioClamp = 0.9f;
-constexpr float drivenAxleEpsilon = 1e-6f;
-constexpr float slipRatioScanStep = 0.015f;
-constexpr int slipRatioScanSteps = 20;
-constexpr float goldenSectionInvPhi = 0.618033988f;
-constexpr int goldenSectionIterations = 10;
-constexpr int forceBisectionIterations = 18;
-
-template <typename ForceFn>
-inline float ascendingBranchSlipRatio(ForceFn forceAt, float target) {
-    float zeroForce = forceAt(0.0f);
-    if (std::abs(target - zeroForce) < minSolveForce) return 0;
-    float direction = target > zeroForce ? 1.0f : -1.0f;
-
-    float peakSlipRatio = 0;
-    float peakForce = zeroForce;
-    for (int scan = 1; scan <= slipRatioScanSteps; scan++) {
-        float slipRatio = direction * slipRatioScanStep * scan;
-        float force = forceAt(slipRatio);
-        if (direction * force > direction * peakForce) {
-            peakForce = force;
-            peakSlipRatio = slipRatio;
-        }
-    }
-    float low = peakSlipRatio - direction * slipRatioScanStep;
-    float high = peakSlipRatio + direction * slipRatioScanStep;
-    float c = high - (high - low) * goldenSectionInvPhi;
-    float d = low + (high - low) * goldenSectionInvPhi;
-    float fc = forceAt(c);
-    float fd = forceAt(d);
-    for (int iter = 0; iter < goldenSectionIterations; iter++) {
-        if (direction * fc > direction * fd) {
-            high = d;
-            d = c;
-            fd = fc;
-            c = high - (high - low) * goldenSectionInvPhi;
-            fc = forceAt(c);
-        } else {
-            low = c;
-            c = d;
-            fc = fd;
-            d = low + (high - low) * goldenSectionInvPhi;
-            fd = forceAt(d);
-        }
-    }
-    peakSlipRatio = (low + high) * 0.5f;
-    peakForce = forceAt(peakSlipRatio);
-    if (direction * target >= direction * peakForce) return peakSlipRatio;
-
-    float lo = 0.0f;
-    float hi = peakSlipRatio;
-    for (int iter = 0; iter < forceBisectionIterations; iter++) {
-        float mid = (lo + hi) * 0.5f;
-        if (direction * forceAt(mid) < direction * target) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    return (lo + hi) * 0.5f;
-}
 
 template <typename Residual>
 inline float bracketedRoot(Residual residual, float warmCenter, float fullLo, float fullHi,
@@ -126,7 +63,8 @@ template <typename Frame>
 Vehicle<Frame>::Vehicle(const Config& config,
                         WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
                         Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
-                        std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable)
+                        std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable,
+                        std::unique_ptr<DifferentialBase<Frame>>&& differential)
     : rollCenterHeightFront(config.get("Vehicle", "rollCenterHeightFront")),
       rollCenterHeightBack(config.get("Vehicle", "rollCenterHeightBack")),
       frontTrackWidth(config.get("Vehicle", "frontTrackWidth")),
@@ -138,7 +76,8 @@ Vehicle<Frame>::Vehicle(const Config& config,
       nonSuspendedMassAtWheels(config.getWheelData<float>("Vehicle", "nonSuspendedMassAtWheels")),
       aero(std::move(aero)),
       steeringTable(std::move(steeringTable)),
-      tires(std::move(tires)) {
+      tires(std::move(tires)),
+      differential(std::move(differential)) {
     combinedNonSuspendedMass = {0, {0, 0, 0}};
     combinedSuspendedMass = {0, {0, 0, 0}};
 
@@ -204,8 +143,6 @@ Vehicle<Frame>::Vehicle(const Config& config,
 
     driveBiasFront = config.get("Vehicle", "driveBiasFront", 0.0f);
     brakeBiasFront = config.get("Vehicle", "brakeBiasFront", 0.6f);
-    frontDiffLocking = config.get("Vehicle", "frontDiffLocking", 1.0f);
-    rearDiffLocking = config.get("Vehicle", "rearDiffLocking", 1.0f);
     dragCoefficientArea = config.get("Aero", "cda", 0.0f);
     airDensityValue = config.get("Environment", "airDensity");
     longEquilibriumEnabled = config.getString("Simlation", "longEquilibrium", "false") == "true";
@@ -239,12 +176,8 @@ void Vehicle<Frame>::computeTireForces(const WheelData<float>& loads,
         float frontBias = driving ? driveBiasFront : brakeBiasFront;
         float frontAxle = longForceDemand * frontBias;
         float rearAxle = longForceDemand * (1.0f - frontBias);
-        bool frontDriven = driveBiasFront > drivenAxleEpsilon;
-        bool rearDriven = (1.0f - driveBiasFront) > drivenAxleEpsilon;
-        solveAxle(0, 1, loads, slipAngles, frontAxle, frontDriven, frontDiffLocking, slipRatio.FL,
-                  slipRatio.FR);
-        solveAxle(2, 3, loads, slipAngles, rearAxle, rearDriven, rearDiffLocking, slipRatio.RL,
-                  slipRatio.RR);
+        solveAxle(0, 1, loads, slipAngles, frontAxle, slipRatio.FL, slipRatio.FR);
+        solveAxle(2, 3, loads, slipAngles, rearAxle, slipRatio.RL, slipRatio.RR);
     }
 
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
@@ -376,70 +309,23 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
 }
 
 template <typename Frame>
-float Vehicle<Frame>::slipRatioForForce(size_t wheel, float load, Alpha<Frame> slipAngle,
-                                        Gamma<Frame> camber, float targetFx) {
-    if (load < minWheelLoad || std::abs(targetFx) < minSolveForce) return 0;
-
-    auto forceAt = [&](float slipRatio) {
-        tires[wheel].value->calculate(load, slipAngle, slipRatio, camber);
-        return tires[wheel].value->getForce().value.x.v;
-    };
-    return ascendingBranchSlipRatio(forceAt, targetFx);
-}
-
-template <typename Frame>
-float Vehicle<Frame>::wheelLongSpeed(size_t wheel) {
-    float x = tires[wheel].position.x.v;
-    float y = tires[wheel].position.y.v;
-    float yawRate = state.angularVelocity.z.v;
-    float contactX = state.velocity.x.v - yawRate * y;
-    float contactY = state.velocity.y.v + yawRate * x;
-    float heading = state.wheelAngles[wheel].v;
-    return contactX * std::cos(heading) + contactY * std::sin(heading);
+AxleWheel<Frame> Vehicle<Frame>::axleWheel(size_t wheel, const WheelData<float>& loads,
+                                           const WheelData<Alpha<Frame>>& slipAngles) {
+    return AxleWheel<Frame>{[this, wheel, &loads, &slipAngles](float slipRatio) {
+        tires[wheel].value->calculate(loads[wheel], slipAngles[wheel], slipRatio, camber[wheel]);
+        return tires[wheel].value->getForce().value.x;
+    }};
 }
 
 template <typename Frame>
 void Vehicle<Frame>::solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
                                const WheelData<Alpha<Frame>>& slipAngles, float axleDemand,
-                               bool hasDiff, float locking, float& leftSlipRatio,
-                               float& rightSlipRatio) {
-    float openForce = axleDemand * 0.5f;
-    float leftOpen = slipRatioForForce(leftWheel, loads[leftWheel], slipAngles[leftWheel],
-                                       camber[leftWheel], openForce);
-    float rightOpen = slipRatioForForce(rightWheel, loads[rightWheel], slipAngles[rightWheel],
-                                        camber[rightWheel], openForce);
-
-    float leftSpeed = wheelLongSpeed(leftWheel);
-    float rightSpeed = wheelLongSpeed(rightWheel);
-    if (!hasDiff || leftSpeed < minWheelSpeed || rightSpeed < minWheelSpeed) {
-        leftSlipRatio = leftOpen;
-        rightSlipRatio = rightOpen;
-        return;
-    }
-
-    float refSpeed = 0.5f * (leftSpeed + rightSpeed);
-    auto clampRatio = [](float ratio) {
-        return std::max(-slipRatioClamp, std::min(slipRatioClamp, ratio));
-    };
-    auto axleForceAt = [&](float meanSlip) {
-        float surfaceSpeed = refSpeed * (1.0f + meanSlip);
-        float leftRatio = clampRatio(surfaceSpeed / leftSpeed - 1.0f);
-        float rightRatio = clampRatio(surfaceSpeed / rightSpeed - 1.0f);
-        tires[leftWheel].value->calculate(loads[leftWheel], slipAngles[leftWheel], leftRatio,
-                                          camber[leftWheel]);
-        float leftForce = tires[leftWheel].value->getForce().value.x.v;
-        tires[rightWheel].value->calculate(loads[rightWheel], slipAngles[rightWheel], rightRatio,
-                                           camber[rightWheel]);
-        float rightForce = tires[rightWheel].value->getForce().value.x.v;
-        return leftForce + rightForce;
-    };
-    float meanSlip = ascendingBranchSlipRatio(axleForceAt, axleDemand);
-    float surfaceSpeed = refSpeed * (1.0f + meanSlip);
-    float lockedLeft = clampRatio(surfaceSpeed / leftSpeed - 1.0f);
-    float lockedRight = clampRatio(surfaceSpeed / rightSpeed - 1.0f);
-
-    leftSlipRatio = (1.0f - locking) * leftOpen + locking * lockedLeft;
-    rightSlipRatio = (1.0f - locking) * rightOpen + locking * lockedRight;
+                               float& leftSlipRatio, float& rightSlipRatio) {
+    AxleSlipRatios ratios =
+        differential->solve(X<Frame>{axleDemand}, axleWheel(leftWheel, loads, slipAngles),
+                            axleWheel(rightWheel, loads, slipAngles));
+    leftSlipRatio = ratios.left;
+    rightSlipRatio = ratios.right;
 }
 
 template <typename Frame>

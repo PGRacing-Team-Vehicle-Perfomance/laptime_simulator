@@ -6,6 +6,7 @@
 #include <map>
 
 #include "vehicle/aero/aeroSimple.h"
+#include "vehicle/differential/differential.h"
 #include "vehicle/tire/tirePacejkaV1.h"
 #include "vehicle/tire/tirePacejkaV2.h"
 #include "vehicle/tire/tireSimple.h"
@@ -80,6 +81,13 @@ std::unique_ptr<SteeringTableBase<VehicleFrame>> Simulation::buildSteeringTable(
         return std::make_unique<SteeringTable<SAE, VehicleFrame>>(cfg);
     }
     throw std::runtime_error("Unknown steeringTable frame: " + frameStr);
+}
+
+template <typename VehicleFrame>
+std::unique_ptr<DifferentialBase<VehicleFrame>> Simulation::buildDifferential(Config& cfg) {
+    std::string impl = cfg.getString("Differential", "implementation", "Open");
+    if (impl == "Open") return std::make_unique<OpenDifferential<VehicleFrame>>();
+    throw std::runtime_error("Unknown differential implementation: " + impl);
 }
 
 template <typename Frame>
@@ -227,7 +235,9 @@ std::vector<std::array<float, 6>> Simulation::run() {
         auto tires = buildTires<VehicleFrame>(cfg);
         auto aero = buildAero<VehicleFrame>(cfg);
         auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable));
+        auto differential = buildDifferential<VehicleFrame>(cfg);
+        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable),
+                                std::move(differential));
         return getYawMomentDiagramPoints(
             v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"),
             cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"),
@@ -238,7 +248,9 @@ std::vector<std::array<float, 6>> Simulation::run() {
         auto tires = buildTires<VehicleFrame>(cfg);
         auto aero = buildAero<VehicleFrame>(cfg);
         auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable));
+        auto differential = buildDifferential<VehicleFrame>(cfg);
+        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable),
+                                std::move(differential));
         return getYawMomentDiagramPoints(
             v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"),
             cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"),
