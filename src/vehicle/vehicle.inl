@@ -431,8 +431,8 @@ template <typename Frame>
 PointSolution Vehicle<Frame>::invalidSolution() {
     float nan = std::numeric_limits<float>::quiet_NaN();
     WheelData<float> nanWheels{nan, nan, nan, nan};
-    return {nan,       nan,       nan,       nan,       nan,       nan,       nanWheels,
-            nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels};
+    return {nan,       nan,       nan,       nan,       nan,       nan,       nanWheels, nanWheels,
+            nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels};
 }
 
 template <typename Frame>
@@ -452,6 +452,8 @@ PointSolution Vehicle<Frame>::assembleSolution(float latAcc, float yawMoment,
     for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
         totalLoad += step.loads[i];
     }
+    auto vehicleFx = getVehicleFxFromTireForces(step.tireForcesX, step.tireForcesY);
+    auto vehicleFy = getVehicleFyFromTireForces(step.tireForcesX, step.tireForcesY);
 
     PointSolution solution;
     solution.latAcc = latAcc;
@@ -466,6 +468,8 @@ PointSolution Vehicle<Frame>::assembleSolution(float latAcc, float yawMoment,
         solution.slipRatio[i] = step.slipRatios[i];
         solution.forceX[i] = step.tireForcesX[i].v;
         solution.forceY[i] = step.tireForcesY[i].v;
+        solution.forceXCar[i] = vehicleFx[i].v;
+        solution.forceYCar[i] = vehicleFy[i].v;
         solution.momentZ[i] = step.tireMomentsZ[i].v;
         solution.camber[i] = camber[i].v * radToDeg;
         solution.aeroLoad[i] = aeroLoads[i];
