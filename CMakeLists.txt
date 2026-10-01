@@ -12,9 +12,10 @@ endif()
 
 set(SOURCE_FILES )
 
-add_executable(${PROJECT_NAME} 
+add_executable(${PROJECT_NAME}
     src/main.cpp
-    src/simulation/simulation.cpp    
+    src/simulation/simulation.cpp
+    src/simulation/diagramMetrics.cpp
 )
 
 target_include_directories(laptime_simulator PRIVATE src)
