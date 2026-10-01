@@ -158,11 +158,11 @@ Vehicle<Frame>::Vehicle(const Config& config,
     brakeBiasFront = config.get("Vehicle", "brakeBiasFront", 0.6f);
     dragCoefficientArea = config.get("Aero", "cda", 0.0f);
     airDensityValue = config.get("Environment", "airDensity");
-    longEquilibriumEnabled = config.getString("Simlation", "longEquilibrium", "false") == "true";
-    targetLongAcc = config.get("Simlation", "targetLongAcc", 0.0f);
+    longEquilibriumEnabled = config.getString("Longitudinal", "equilibrium", "false") == "true";
+    targetLongAcc = config.get("Longitudinal", "targetAcc", 0.0f);
     tireCalibrationSlip = config.get("Tire", "calibrationSlipAngle", 90.0f) *
                           config.angleUnitScale("Tire", "calibrationSlipAngle");
-    lateralAccBracketG = config.get("Simlation", "latAccBracketG", 4.0f);
+    lateralAccBracketG = config.get("Solver", "latAccBracketG", 4.0f);
 }
 
 template <typename Frame>
@@ -218,8 +218,8 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectLatAcc(const Config& c
         return evaluateAt(Y<Frame>{testLatAcc}, config).latAcc.v - testLatAcc;
     };
 
-    float root = bracketedRoot(residualAt, 0.0f, -maxLatAcc, maxLatAcc, maxLatAcc, tolerance,
-                               maxIterations);
+    float root =
+        bracketedRoot(residualAt, 0.0f, -maxLatAcc, maxLatAcc, maxLatAcc, tolerance, maxIterations);
     SolverStep step;
     if (std::isnan(root)) {
         step = evaluateAt(Y<Frame>{0}, config);
@@ -236,7 +236,8 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectLatAcc(const Config& c
 template <typename Frame>
 typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectDemand(const Config& config,
                                                                  float maxForce, float maxLatAcc,
-                                                                 float tolerance, int maxIterations) {
+                                                                 float tolerance,
+                                                                 int maxIterations) {
     float frozenLongAcc = longitudinalAccEstimate;
     SolverStep step;
     auto longResidualAt = [&](float testDemand) {
@@ -247,8 +248,8 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectDemand(const Config& c
     };
 
     float demandTolerance = combinedTotalMass.value * tolerance;
-    float root = bracketedRoot(longResidualAt, 0.0f, -maxForce, maxForce, maxForce,
-                               demandTolerance, maxIterations);
+    float root = bracketedRoot(longResidualAt, 0.0f, -maxForce, maxForce, maxForce, demandTolerance,
+                               maxIterations);
     if (std::isnan(root)) {
         float rLo = longResidualAt(-maxForce);
         float rHi = longResidualAt(maxForce);

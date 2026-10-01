@@ -54,10 +54,10 @@ Tire,scalingFac,0.75
 Tire,quadFac,-0.0002
 Tire,linFac,1.5
 Tire,radFac,0.85
-Simlation,maxSlipAngle,20
-Simlation,maxSteeringAngle,13.10
-Simlation,slipAngleStep,1
-Simlation,steeringAngleStep,2
-Simlation,speed,10.56
-Simlation,tolerance,0.01
-Simlation,maxIterations,100
+Sweep,maxSlipAngle,20
+Sweep,maxSteeringAngle,13.10
+Sweep,slipAngleStep,1
+Sweep,steeringAngleStep,2
+Sweep,speed,10.56
+Solver,tolerance,0.01
+Solver,maxIterations,100

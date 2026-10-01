@@ -175,6 +175,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(slipAngles.size());
     std::vector<double> lineSeconds(slipAngles.size(), 0.0);
     size_t baseDone = 0;
+    printProgressBar("base sweep", 0, slipAngles.size());  // show the phase before line 1 finishes
 #pragma omp parallel for schedule(dynamic)
     for (size_t line = 0; line < slipAngles.size(); line++) {
         auto tLine = Clock::now();
@@ -215,7 +216,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     double prepSeconds = 0.0, slipRefineSeconds = 0.0, steerRefineSeconds = 0.0;
     size_t slipAdded = 0, steerAdded = 0;
     std::vector<DiagramSample> slipRefined;
-    bool refine = cfg.get("Simlation", "refine", 1.0f) > 0.5f;
+    bool refine = cfg.getString("Refine", "enabled", "true") == "true";
     if (refine) {
         auto tPrep = Clock::now();
         float latMin = 1e30f, latMax = -1e30f, yawMin = 1e30f, yawMax = -1e30f;
@@ -260,8 +261,8 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         }
         std::sort(gaps.begin(), gaps.end());
         float median = gaps.empty() ? 0.0f : gaps[gaps.size() / 2];
-        float target = cfg.get("Simlation", "refineFactor", 1.5f) * median;
-        int maxDepth = (int)cfg.get("Simlation", "refineMaxDepth", 4.0f);
+        float target = cfg.get("Refine", "factor", 1.5f) * median;
+        int maxDepth = (int)cfg.get("Refine", "maxDepth", 4.0f);
 
         using MidSolver = std::function<DiagramSample(Vehicle<Frame>&, const DiagramSample&,
                                                       const DiagramSample&)>;
@@ -285,6 +286,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
 
         auto tSteer = Clock::now();
         size_t steerDone = 0;
+        printProgressBar("steer refine", 0, isolines.size());
 #pragma omp parallel for schedule(dynamic)
         for (size_t line = 0; line < isolines.size(); line++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
@@ -313,6 +315,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         }
         std::vector<std::vector<DiagramSample>> refinedGroups(groups.size());
         size_t slipDone = 0;
+        printProgressBar("slip refine", 0, groups.size());
 #pragma omp parallel for schedule(dynamic)
         for (size_t g = 0; g < groups.size(); g++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
@@ -453,10 +456,10 @@ std::vector<DiagramSample> Simulation::run() {
                 buildSteeringTable<VehicleFrame>(cfg), buildDifferential<VehicleFrame>(cfg));
         };
         return getYawMomentDiagramPoints<VehicleFrame>(
-            makeVehicle, cfg.get("Simlation", "speed"), cfg,
-            cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"),
-            cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"),
-            cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
+            makeVehicle, cfg.get("Sweep", "speed"), cfg, cfg.get("Sweep", "maxSteeringAngle"),
+            cfg.get("Sweep", "steeringAngleStep"), cfg.get("Sweep", "maxSlipAngle"),
+            cfg.get("Sweep", "slipAngleStep"), cfg.get("Solver", "tolerance"),
+            cfg.get("Solver", "maxIterations"));
     } else if (vehicleFrameStr == "SAE") {
         using VehicleFrame = SAE;
         auto makeVehicle = [this]() {
@@ -465,10 +468,10 @@ std::vector<DiagramSample> Simulation::run() {
                 buildSteeringTable<VehicleFrame>(cfg), buildDifferential<VehicleFrame>(cfg));
         };
         return getYawMomentDiagramPoints<VehicleFrame>(
-            makeVehicle, cfg.get("Simlation", "speed"), cfg,
-            cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"),
-            cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"),
-            cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
+            makeVehicle, cfg.get("Sweep", "speed"), cfg, cfg.get("Sweep", "maxSteeringAngle"),
+            cfg.get("Sweep", "steeringAngleStep"), cfg.get("Sweep", "maxSlipAngle"),
+            cfg.get("Sweep", "slipAngleStep"), cfg.get("Solver", "tolerance"),
+            cfg.get("Solver", "maxIterations"));
     } else {
         throw std::runtime_error("Unknown vehicle frame: " + vehicleFrameStr);
     }
