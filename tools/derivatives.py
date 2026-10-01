@@ -211,26 +211,27 @@ def render_derivative_figures(data, title_prefix=""):
     }
 
 
-FLAG_COLUMNS = ("baseSteering", "baseSlip")
-ENRICHED_COLUMNS = ["steering", "slip", "latAcc", "yawMoment", CONTROL_KEY, STABILITY_KEY,
-                    *FLAG_COLUMNS]
+DERIVATIVE_COLUMNS = [CONTROL_KEY, STABILITY_KEY]
 
 CONTROL_DIFF_KEY = "d_control_vs_base"
 STABILITY_DIFF_KEY = "d_stability_vs_base"
 
 
-def enriched_cell(point, column):
-    if column in FLAG_COLUMNS:
-        return int(bool(point.get(column, True)))
-    return point.get(column)
-
-
 def write_enriched_csv(path, data):
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        source_columns = list(reader.fieldnames or [])
+        source_rows = list(reader)
+    derivatives = {(point["steering"], point["slip"]): point for point in data}
+    columns = source_columns + [c for c in DERIVATIVE_COLUMNS if c not in source_columns]
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(ENRICHED_COLUMNS)
-        for point in data:
-            writer.writerow([enriched_cell(point, column) for column in ENRICHED_COLUMNS])
+        writer.writerow(columns)
+        for row in source_rows:
+            point = derivatives.get((float(row["steering"]), float(row["slip"])))
+            row[CONTROL_KEY] = point[CONTROL_KEY] if point else None
+            row[STABILITY_KEY] = point[STABILITY_KEY] if point else None
+            writer.writerow([row.get(column) for column in columns])
 
 
 def diff_value(point, base_point, key):

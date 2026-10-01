@@ -15,14 +15,14 @@ int main(int argc, char* argv[]) {
     
     Config cfg(configPath);
     Simulation sim(cfg);
-    
-    std::vector<std::array<float, 6>> points = sim.run();
+
+    std::vector<DiagramSample> points = sim.run();
 
     FILE* f = fopen("build/yaw_diagram.csv", "w");
     if (f) {
-        fprintf(f, "steering,slip,latAcc,yawMoment,baseSteering,baseSlip\n");
-        for (const auto& p : points) {
-            fprintf(f, "%f,%f,%f,%f,%f,%f\n", p[0], p[1], p[2], p[3], p[4], p[5]);
+        writeDiagramHeader(f);
+        for (const DiagramSample& p : points) {
+            writeDiagramRow(f, p);
         }
         fclose(f);
         std::cout << "Wrote build/yaw_diagram.csv\n";
