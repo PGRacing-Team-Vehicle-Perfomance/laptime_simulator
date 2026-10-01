@@ -138,6 +138,12 @@ class Vehicle {
     void setSpeed(float speed);
 
     PointSolution solveDiagramPoint(float tolerance, int maxIterations, const Config& config);
+
+    size_t solverEvaluations = 0;
+    double loadSeconds = 0;
+    double slipAngleSeconds = 0;
+    double tireForceSeconds = 0;
+    double axleSolveSeconds = 0;
 };
 
 #include "vehicle.inl"

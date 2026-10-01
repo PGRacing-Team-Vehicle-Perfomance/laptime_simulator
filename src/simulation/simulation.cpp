@@ -1,7 +1,9 @@
 #include "simulation/simulation.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <map>
 #include <memory>
@@ -35,6 +37,12 @@ int workerIndex() {
 #else
     return 0;
 #endif
+}
+
+using Clock = std::chrono::steady_clock;
+
+double secondsSince(Clock::time_point start) {
+    return std::chrono::duration<double>(Clock::now() - start).count();
 }
 }  // namespace
 
@@ -119,11 +127,13 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     const std::function<std::unique_ptr<Vehicle<Frame>>()>& makeVehicle, float speed,
     const Config& cfg, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle,
     float slipAngleStep, float tolerance, int maxIterations) {
+    auto tStart = Clock::now();
     std::vector<std::unique_ptr<Vehicle<Frame>>> pool;
     for (int i = 0; i < workerCount(); i++) {
         pool.push_back(makeVehicle());
         pool.back()->setSpeed(speed);
     }
+    double poolSeconds = secondsSince(tStart);
 
     auto solveAt = [&](Vehicle<Frame>& v, float steering, float slip, bool inSteer, bool inSlip) {
         v.setSteeringAngle(Alpha<Frame>(steering * M_PI / 180.f));
@@ -138,9 +148,12 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         steeringAngles.push_back(steeringAngle);
     }
 
+    auto tBaseStart = Clock::now();
     std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(steeringAngles.size());
+    std::vector<double> lineSeconds(steeringAngles.size(), 0.0);
 #pragma omp parallel for schedule(dynamic)
     for (size_t line = 0; line < steeringAngles.size(); line++) {
+        auto tLine = Clock::now();
         Vehicle<Frame>& v = *pool[workerIndex()];
         float steeringAngle = steeringAngles[line];
         std::vector<DiagramSample> samples;
@@ -148,11 +161,18 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             samples.push_back(solveAt(v, steeringAngle, slip, true, true));
         }
         isolines[line] = {steeringAngle, std::move(samples)};
+        lineSeconds[line] = secondsSince(tLine);
     }
+    double baseSeconds = secondsSince(tBaseStart);
+    size_t basePoints = 0;
+    for (const auto& [steeringAngle, samples] : isolines) basePoints += samples.size();
 
+    double prepSeconds = 0.0, slipRefineSeconds = 0.0, steerRefineSeconds = 0.0;
+    size_t slipAdded = 0, steerAdded = 0;
     std::vector<DiagramSample> steeringRefined;
     bool refine = cfg.get("Simlation", "refine", 1.0f) > 0.5f;
     if (refine) {
+        auto tPrep = Clock::now();
         float latMin = 1e30f, latMax = -1e30f, yawMin = 1e30f, yawMax = -1e30f;
         for (auto& [steering, samples] : isolines) {
             for (const DiagramSample& s : samples) {
@@ -216,6 +236,9 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         MidSolver slipMid = [&](Vehicle<Frame>& v, const DiagramSample& l, const DiagramSample& r) {
             return solveAt(v, l.steering, 0.5f * (l.slip + r.slip), true, false);
         };
+        prepSeconds = secondsSince(tPrep);
+
+        auto tSlip = Clock::now();
 #pragma omp parallel for schedule(dynamic)
         for (size_t line = 0; line < isolines.size(); line++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
@@ -227,7 +250,12 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             }
             samples = std::move(refined);
         }
+        slipRefineSeconds = secondsSince(tSlip);
+        size_t afterSlip = 0;
+        for (const auto& [steering, samples] : isolines) afterSlip += samples.size();
+        slipAdded = afterSlip - basePoints;
 
+        auto tSteer = Clock::now();
         MidSolver steeringMid = [&](Vehicle<Frame>& v, const DiagramSample& l,
                                     const DiagramSample& r) {
             return solveAt(v, 0.5f * (l.steering + r.steering), l.slip, false, true);
@@ -248,8 +276,11 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         for (const std::vector<DiagramSample>& refined : refinedGroups) {
             for (const DiagramSample& s : refined) steeringRefined.push_back(s);
         }
+        steerRefineSeconds = secondsSince(tSteer);
+        steerAdded = steeringRefined.size();
     }
 
+    auto tAssemble = Clock::now();
     std::vector<DiagramSample> out;
     for (auto& [steering, samples] : isolines) {
         for (const DiagramSample& s : samples) out.push_back(s);
@@ -259,6 +290,62 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     std::sort(out.begin(), out.end(), [](const DiagramSample& a, const DiagramSample& b) {
         return a.steering != b.steering ? a.steering < b.steering : a.slip < b.slip;
     });
+
+    double assembleSeconds = secondsSince(tAssemble);
+    double totalSeconds = secondsSince(tStart);
+    double points = out.empty() ? 1.0 : static_cast<double>(out.size());
+
+    double lineMin = lineSeconds.empty() ? 0.0 : lineSeconds.front();
+    double lineMax = 0.0, lineSum = 0.0;
+    for (double s : lineSeconds) {
+        lineMin = std::min(lineMin, s);
+        lineMax = std::max(lineMax, s);
+        lineSum += s;
+    }
+    double lineAvg = lineSeconds.empty() ? 0.0 : lineSum / lineSeconds.size();
+
+    size_t evaluations = 0;
+    double loadSeconds = 0, slipAngleSeconds = 0, tireForceSeconds = 0, axleSolveSeconds = 0;
+    for (const auto& v : pool) {
+        evaluations += v->solverEvaluations;
+        loadSeconds += v->loadSeconds;
+        slipAngleSeconds += v->slipAngleSeconds;
+        tireForceSeconds += v->tireForceSeconds;
+        axleSolveSeconds += v->axleSolveSeconds;
+    }
+    double solverCpu = loadSeconds + slipAngleSeconds + tireForceSeconds;
+    auto cpuShare = [&](double seconds) {
+        return solverCpu > 0 ? 100.0 * seconds / solverCpu : 0.0;
+    };
+
+    size_t nonConverged = 0;
+    for (const DiagramSample& s : out) {
+        if (!std::isfinite(s.solution.latAcc)) nonConverged++;
+    }
+
+    auto share = [&](double seconds) {
+        return totalSeconds > 0 ? 100.0 * seconds / totalSeconds : 0.0;
+    };
+    fprintf(stderr,
+            "[sim] threads=%d  pts=%zu  total=%.3fs (%.0f pts/s)  evals=%zu (%.1f/pt)  "
+            "non-converged=%zu (%.1f%%)\n"
+            "      pool=%.3fs (%.0f%%)  base=%zu pts %.3fs (%.0f%%)  prep=%.3fs (%.0f%%)  "
+            "slip-refine=+%zu pts %.3fs (%.0f%%)  steer-refine=+%zu pts %.3fs (%.0f%%)  "
+            "assemble=%.3fs (%.0f%%)\n"
+            "      base line time: min=%.1fms avg=%.1fms max=%.1fms over %zu lines\n",
+            workerCount(), out.size(), totalSeconds, out.size() / totalSeconds, evaluations,
+            evaluations / points, nonConverged, 100.0 * nonConverged / points, poolSeconds,
+            share(poolSeconds), basePoints, baseSeconds, share(baseSeconds), prepSeconds,
+            share(prepSeconds), slipAdded, slipRefineSeconds, share(slipRefineSeconds), steerAdded,
+            steerRefineSeconds, share(steerRefineSeconds), assembleSeconds, share(assembleSeconds),
+            lineMin * 1000, lineAvg * 1000, lineMax * 1000, lineSeconds.size());
+    double lateralTireSeconds = tireForceSeconds - axleSolveSeconds;
+    fprintf(stderr,
+            "      solver cpu (sum over %d threads): longitudinal-axle=%.2fs (%.0f%%)  "
+            "lateral-tire=%.2fs (%.0f%%)  loads+aero=%.2fs (%.0f%%)  slip-angles=%.2fs (%.0f%%)\n",
+            workerCount(), axleSolveSeconds, cpuShare(axleSolveSeconds), lateralTireSeconds,
+            cpuShare(lateralTireSeconds), loadSeconds, cpuShare(loadSeconds), slipAngleSeconds,
+            cpuShare(slipAngleSeconds));
     return out;
 }
 
