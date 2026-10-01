@@ -158,37 +158,68 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
          steeringAngle += steeringAngleStep) {
         steeringAngles.push_back(steeringAngle);
     }
+    std::vector<float> slipAngles;
+    for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
+        slipAngles.push_back(slip);
+    }
+    // Each slip isoline solves steeringAngles[centerSteering] first, so an empty
+    // steering grid (pathological config) would dereference past the vector.
+    if (steeringAngles.empty() || slipAngles.empty()) return {};
+    size_t centerSteering = 0;
+    for (size_t i = 1; i < steeringAngles.size(); i++) {
+        if (std::abs(steeringAngles[i]) < std::abs(steeringAngles[centerSteering]))
+            centerSteering = i;
+    }
 
     auto tBaseStart = Clock::now();
-    std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(steeringAngles.size());
-    std::vector<double> lineSeconds(steeringAngles.size(), 0.0);
+    std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(slipAngles.size());
+    std::vector<double> lineSeconds(slipAngles.size(), 0.0);
     size_t baseDone = 0;
 #pragma omp parallel for schedule(dynamic)
-    for (size_t line = 0; line < steeringAngles.size(); line++) {
+    for (size_t line = 0; line < slipAngles.size(); line++) {
         auto tLine = Clock::now();
         Vehicle<Frame>& v = *pool[workerIndex()];
-        float steeringAngle = steeringAngles[line];
-        std::vector<DiagramSample> samples;
-        for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
-            samples.push_back(solveAt(v, steeringAngle, slip, true, true));
+        float slip = slipAngles[line];
+        DiagramSample center = solveAt(v, steeringAngles[centerSteering], slip, true, true);
+        std::vector<DiagramSample> forward, backward;
+        float forwardLat = center.solution.latAcc;
+        for (size_t i = centerSteering + 1; i < steeringAngles.size(); i++) {
+            DiagramSample sample = solveAt(v, steeringAngles[i], slip, true, true);
+            if (!std::isfinite(sample.solution.latAcc) || sample.solution.latAcc < forwardLat)
+                break;
+            forward.push_back(sample);
+            forwardLat = sample.solution.latAcc;
         }
-        isolines[line] = {steeringAngle, std::move(samples)};
+        float backwardLat = center.solution.latAcc;
+        for (size_t i = centerSteering; i-- > 0;) {
+            DiagramSample sample = solveAt(v, steeringAngles[i], slip, true, true);
+            if (!std::isfinite(sample.solution.latAcc) || sample.solution.latAcc > backwardLat)
+                break;
+            backward.push_back(sample);
+            backwardLat = sample.solution.latAcc;
+        }
+        std::vector<DiagramSample> samples;
+        samples.reserve(backward.size() + 1 + forward.size());
+        for (auto it = backward.rbegin(); it != backward.rend(); ++it) samples.push_back(*it);
+        samples.push_back(center);
+        for (DiagramSample& sample : forward) samples.push_back(sample);
+        isolines[line] = {slip, std::move(samples)};
         lineSeconds[line] = secondsSince(tLine);
 #pragma omp critical
-        printProgressBar("base sweep", ++baseDone, steeringAngles.size());
+        printProgressBar("base sweep", ++baseDone, slipAngles.size());
     }
     double baseSeconds = secondsSince(tBaseStart);
     size_t basePoints = 0;
-    for (const auto& [steeringAngle, samples] : isolines) basePoints += samples.size();
+    for (const auto& [slip, samples] : isolines) basePoints += samples.size();
 
     double prepSeconds = 0.0, slipRefineSeconds = 0.0, steerRefineSeconds = 0.0;
     size_t slipAdded = 0, steerAdded = 0;
-    std::vector<DiagramSample> steeringRefined;
+    std::vector<DiagramSample> slipRefined;
     bool refine = cfg.get("Simlation", "refine", 1.0f) > 0.5f;
     if (refine) {
         auto tPrep = Clock::now();
         float latMin = 1e30f, latMax = -1e30f, yawMin = 1e30f, yawMax = -1e30f;
-        for (auto& [steering, samples] : isolines) {
+        for (auto& [slip, samples] : isolines) {
             for (const DiagramSample& s : samples) {
                 latMin = std::min(latMin, s.solution.latAcc);
                 latMax = std::max(latMax, s.solution.latAcc);
@@ -204,26 +235,25 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             return std::sqrt(dl * dl + dy * dy);
         };
 
-        std::map<long, std::vector<DiagramSample>> baseBySlip;
-        for (auto& [steering, samples] : isolines) {
+        std::map<long, std::vector<DiagramSample>> baseBySteering;
+        for (auto& [slip, samples] : isolines) {
             for (const DiagramSample& s : samples) {
-                baseBySlip[std::lround(s.slip / slipAngleStep)].push_back(s);
+                baseBySteering[std::lround(s.steering / steeringAngleStep)].push_back(s);
             }
         }
-        for (auto& [key, group] : baseBySlip) {
-            std::sort(group.begin(), group.end(),
-                      [](const DiagramSample& a, const DiagramSample& b) {
-                          return a.steering < b.steering;
-                      });
+        for (auto& [key, group] : baseBySteering) {
+            std::sort(
+                group.begin(), group.end(),
+                [](const DiagramSample& a, const DiagramSample& b) { return a.slip < b.slip; });
         }
 
         std::vector<float> gaps;
-        for (auto& [steering, samples] : isolines) {
+        for (auto& [slip, samples] : isolines) {
             for (size_t i = 1; i < samples.size(); i++) {
                 gaps.push_back(distance(samples[i - 1], samples[i]));
             }
         }
-        for (auto& [key, group] : baseBySlip) {
+        for (auto& [key, group] : baseBySteering) {
             for (size_t i = 1; i < group.size(); i++) {
                 gaps.push_back(distance(group[i - 1], group[i]));
             }
@@ -247,65 +277,65 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             bisect(v, mid, right, depth - 1, solveMid, into);
         };
 
-        MidSolver slipMid = [&](Vehicle<Frame>& v, const DiagramSample& l, const DiagramSample& r) {
-            return solveAt(v, l.steering, 0.5f * (l.slip + r.slip), true, false);
+        MidSolver steeringMid = [&](Vehicle<Frame>& v, const DiagramSample& l,
+                                    const DiagramSample& r) {
+            return solveAt(v, 0.5f * (l.steering + r.steering), l.slip, false, true);
         };
         prepSeconds = secondsSince(tPrep);
 
-        auto tSlip = Clock::now();
-        size_t slipDone = 0;
+        auto tSteer = Clock::now();
+        size_t steerDone = 0;
 #pragma omp parallel for schedule(dynamic)
         for (size_t line = 0; line < isolines.size(); line++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
             std::vector<DiagramSample>& samples = isolines[line].second;
             std::vector<DiagramSample> refined{samples[0]};
             for (size_t i = 1; i < samples.size(); i++) {
-                bisect(v, samples[i - 1], samples[i], maxDepth, slipMid, refined);
+                bisect(v, samples[i - 1], samples[i], maxDepth, steeringMid, refined);
                 refined.push_back(samples[i]);
             }
             samples = std::move(refined);
 #pragma omp critical
-            printProgressBar("slip refine", ++slipDone, isolines.size());
+            printProgressBar("steer refine", ++steerDone, isolines.size());
         }
-        slipRefineSeconds = secondsSince(tSlip);
-        size_t afterSlip = 0;
-        for (const auto& [steering, samples] : isolines) afterSlip += samples.size();
-        slipAdded = afterSlip - basePoints;
+        steerRefineSeconds = secondsSince(tSteer);
+        size_t afterSteer = 0;
+        for (const auto& [slip, samples] : isolines) afterSteer += samples.size();
+        steerAdded = afterSteer - basePoints;
 
-        auto tSteer = Clock::now();
-        MidSolver steeringMid = [&](Vehicle<Frame>& v, const DiagramSample& l,
-                                    const DiagramSample& r) {
-            return solveAt(v, 0.5f * (l.steering + r.steering), l.slip, false, true);
+        auto tSlip = Clock::now();
+        MidSolver slipMid = [&](Vehicle<Frame>& v, const DiagramSample& l, const DiagramSample& r) {
+            return solveAt(v, l.steering, 0.5f * (l.slip + r.slip), true, false);
         };
         std::vector<std::vector<DiagramSample>*> groups;
-        for (auto& [key, group] : baseBySlip) {
+        for (auto& [key, group] : baseBySteering) {
             groups.push_back(&group);
         }
         std::vector<std::vector<DiagramSample>> refinedGroups(groups.size());
-        size_t steerDone = 0;
+        size_t slipDone = 0;
 #pragma omp parallel for schedule(dynamic)
         for (size_t g = 0; g < groups.size(); g++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
             std::vector<DiagramSample>& group = *groups[g];
             for (size_t i = 1; i < group.size(); i++) {
-                bisect(v, group[i - 1], group[i], maxDepth, steeringMid, refinedGroups[g]);
+                bisect(v, group[i - 1], group[i], maxDepth, slipMid, refinedGroups[g]);
             }
 #pragma omp critical
-            printProgressBar("steer refine", ++steerDone, groups.size());
+            printProgressBar("slip refine", ++slipDone, groups.size());
         }
         for (const std::vector<DiagramSample>& refined : refinedGroups) {
-            for (const DiagramSample& s : refined) steeringRefined.push_back(s);
+            for (const DiagramSample& s : refined) slipRefined.push_back(s);
         }
-        steerRefineSeconds = secondsSince(tSteer);
-        steerAdded = steeringRefined.size();
+        slipRefineSeconds = secondsSince(tSlip);
+        slipAdded = slipRefined.size();
     }
 
     auto tAssemble = Clock::now();
     std::vector<DiagramSample> out;
-    for (auto& [steering, samples] : isolines) {
+    for (auto& [slip, samples] : isolines) {
         for (const DiagramSample& s : samples) out.push_back(s);
     }
-    for (const DiagramSample& s : steeringRefined) out.push_back(s);
+    for (const DiagramSample& s : slipRefined) out.push_back(s);
 
     std::sort(out.begin(), out.end(), [](const DiagramSample& a, const DiagramSample& b) {
         return a.steering != b.steering ? a.steering < b.steering : a.slip < b.slip;
