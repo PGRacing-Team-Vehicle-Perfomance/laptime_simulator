@@ -30,7 +30,8 @@ struct ScopedTimer {
 
 constexpr int longitudinalRelaxIterations = 8;
 constexpr int newtonIterations = 12;
-constexpr float newtonStepScale = 10.0f;
+// finite-difference step sized to each variable's range, not the tolerance
+constexpr float jacobianRelStep = 0.1f;
 constexpr float newtonSingularJacobianEpsilon = 1e-6f;
 
 template <typename Residual>
@@ -289,8 +290,8 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
 
         float latAcc = 0;
         float demand = 0;
-        float epsLat = newtonStepScale * tolerance;
-        float epsDemand = newtonStepScale * combinedTotalMass.value * tolerance;
+        float epsLat = jacobianRelStep * maxLatAcc;
+        float epsDemand = jacobianRelStep * maxForce;
         bool converged = false;
         for (int iter = 0; iter < newtonIterations; iter++) {
             float r1, r2;
