@@ -443,3 +443,45 @@ std::vector<DiagramSample> Simulation::run() {
         throw std::runtime_error("Unknown vehicle frame: " + vehicleFrameStr);
     }
 }
+
+template <typename Frame>
+void Simulation::dumpTireFrame(FILE* f) {
+    auto tires = buildTires<Frame>(cfg);
+    TireBase<Frame>& tire = *tires.FL.value;
+    constexpr float degToRad = static_cast<float>(M_PI) / 180.0f;
+    float loads[] = {250.0f, 500.0f, 750.0f, 1000.0f, 1500.0f};
+    for (float load : loads) {
+        for (float kappa = -0.3f; kappa <= 0.3001f; kappa += 0.005f) {
+            tire.calculate(load, Alpha<Frame>(0.0f), kappa, Gamma<Frame>(0.0f));
+            fprintf(f, "slipRatio,%.0f,%.5f,%f,%f,%f\n", load, kappa, tire.getForce().value.x.v,
+                    tire.getForce().value.y.v, tire.getTorque().z.v);
+        }
+    }
+    for (float load : loads) {
+        for (float deg = -20.0f; deg <= 20.001f; deg += 0.5f) {
+            tire.calculate(load, Alpha<Frame>(deg * degToRad), 0.0f, Gamma<Frame>(0.0f));
+            fprintf(f, "slipAngle,%.0f,%.5f,%f,%f,%f\n", load, deg, tire.getForce().value.x.v,
+                    tire.getForce().value.y.v, tire.getTorque().z.v);
+        }
+    }
+}
+
+void Simulation::dumpTireModel(const std::string& path) {
+    FILE* f = fopen(path.c_str(), "w");
+    if (!f) {
+        fprintf(stderr, "Failed to open %s for writing\n", path.c_str());
+        return;
+    }
+    fprintf(f, "sweep,load,input,Fx,Fy,Mz\n");
+    std::string frameStr = cfg.getString("Vehicle", "frame");
+    if (frameStr == "ISO8855") {
+        dumpTireFrame<ISO8855>(f);
+    } else if (frameStr == "SAE") {
+        dumpTireFrame<SAE>(f);
+    } else {
+        fclose(f);
+        throw std::runtime_error("Unknown vehicle frame: " + frameStr);
+    }
+    fclose(f);
+    printf("Wrote %s\n", path.c_str());
+}
