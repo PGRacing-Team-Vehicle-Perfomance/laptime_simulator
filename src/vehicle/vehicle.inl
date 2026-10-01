@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -14,6 +15,18 @@
 #include "vehicle/slipSolve.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
+
+namespace {
+struct ScopedTimer {
+    double& accumulator;
+    std::chrono::steady_clock::time_point start;
+    explicit ScopedTimer(double& acc) : accumulator(acc), start(std::chrono::steady_clock::now()) {}
+    ~ScopedTimer() {
+        accumulator +=
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    }
+};
+}  // namespace
 
 constexpr int longitudinalRelaxIterations = 8;
 constexpr int newtonIterations = 12;
@@ -170,6 +183,8 @@ template <typename Frame>
 void Vehicle<Frame>::computeTireForces(const WheelData<float>& loads,
                                        const WheelData<Alpha<Frame>>& slipAngles,
                                        SolverStep& step) {
+    solverEvaluations++;
+    ScopedTimer timer(tireForceSeconds);
     WheelData<float> slipRatio{};
     if (longEquilibriumEnabled && std::abs(longForceDemand) > minSolveForce) {
         bool driving = longForceDemand > 0;
@@ -324,6 +339,7 @@ template <typename Frame>
 void Vehicle<Frame>::solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
                                const WheelData<Alpha<Frame>>& slipAngles, float axleDemand,
                                float& leftSlipRatio, float& rightSlipRatio) {
+    ScopedTimer timer(axleSolveSeconds);
     AxleSlipRatios ratios =
         differential->solve(X<Frame>{axleDemand}, axleWheel(leftWheel, loads, slipAngles),
                             axleWheel(rightWheel, loads, slipAngles));
@@ -506,6 +522,7 @@ void Vehicle<Frame>::setSpeed(float speed) {
 
 template <typename Frame>
 WheelData<Alpha<Frame>> Vehicle<Frame>::calculateSlipAngles() {
+    ScopedTimer timer(slipAngleSeconds);
     float massToFront = combinedTotalMass.position.x.v;
     float massToRear = trackDistance - massToFront;
 
@@ -596,6 +613,7 @@ WheelData<Y<Frame>> Vehicle<Frame>::getVelocityFyFromTireForces(const WheelData<
 
 template <typename Frame>
 WheelData<float> Vehicle<Frame>::totalTireLoads(Y<Frame> latAcc, const Config& config) {
+    ScopedTimer timer(loadSeconds);
     float earthAcc = config.get("Environment", "earthAcc");
     auto staticLoads = staticLoad(earthAcc);
     auto aeroLoads = aeroLoad(config);

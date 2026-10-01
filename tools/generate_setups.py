@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 import matplotlib
 
@@ -515,6 +516,7 @@ def main():
     results_dir = os.path.join(repo_root, args.results_dir)
     run_dir, run_id = next_run_dir(results_dir)
     os.makedirs(run_dir, exist_ok=True)
+    run_start = time.perf_counter()
     print(f"Run {run_id:03d} → {run_dir} ({len(setups)} setup{'s' if not single else ''})")
 
     def process_setup(setup, base_data):
@@ -526,11 +528,15 @@ def main():
         else:
             with open(setup_config, "w", newline="") as f:
                 f.writelines(apply_overrides(base_lines, setup["overrides"]))
+        sim_start = time.perf_counter()
         produced_csv = run_simulation(binary, setup_config, repo_root)
+        sim_seconds = time.perf_counter() - sim_start
         setup_csv = os.path.join(setup_dir, "yaw_diagram.csv")
         shutil.copyfile(produced_csv, setup_csv)
+        render_start = time.perf_counter()
         data = render_setup(setup_dir, setup_csv, f"{setup['label']} — ", base_data)
-        print(f"  {setup['name'] or config_name} done")
+        render_seconds = time.perf_counter() - render_start
+        print(f"  {setup['name'] or config_name} done  (sim {sim_seconds:.1f}s, render {render_seconds:.1f}s)")
         return data
 
     base_setup = next(s for s in setups if s["is_base"])
@@ -545,10 +551,12 @@ def main():
     if not single:
         summary_dir = os.path.join(run_dir, "_summary")
         os.makedirs(summary_dir, exist_ok=True)
+        montage_start = time.perf_counter()
         for plot_type in MONTAGE_TYPES:
             build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
+        print(f"  montages done  ({time.perf_counter() - montage_start:.1f}s)")
 
-    print(f"Done: {run_dir}")
+    print(f"Done: {run_dir} (total {time.perf_counter() - run_start:.1f}s)")
 
 
 if __name__ == "__main__":
