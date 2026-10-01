@@ -18,3 +18,8 @@ add_executable(${PROJECT_NAME}
 )
 
 target_include_directories(laptime_simulator PRIVATE src)
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(laptime_simulator PRIVATE OpenMP::OpenMP_CXX)
+endif()
