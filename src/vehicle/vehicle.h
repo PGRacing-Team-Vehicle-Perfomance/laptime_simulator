@@ -26,6 +26,8 @@ struct PointSolution {
     WheelData<float> slipRatio;
     WheelData<float> forceX;
     WheelData<float> forceY;
+    WheelData<float> forceXCar;
+    WheelData<float> forceYCar;
     WheelData<float> momentZ;
     WheelData<float> camber;
     WheelData<float> aeroLoad;
