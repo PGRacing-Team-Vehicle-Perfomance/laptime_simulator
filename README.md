@@ -47,10 +47,13 @@ cmake --build .
 
 All parameters are loaded at runtime via CSV configuration files (see `config_pacejka_v1.csv` or `config_simple.csv`). Configuration file allows to select frame of reference for vehicle and tires. Currently ISO8855 and SAE frames are supported.
 
-- **Vehicle**: Mass, aero, suspension parameters.
-- **Tire**: Implementation selection (`Simple`, `PacejkaV1`, `PacejkaV2`), magic formula coefficients.
-- **Environment**: Air density, wind conditions, etc.
-- **Simulation**: Iterator boundaries, slip angle ranges, and speed.
+- **Environment**: Air density (temperature/pressure/humidity), gravity, wind.
+- **Vehicle**: Mass distribution, geometry, suspension rates, alignment, steering table.
+- **Aero / Tire / Differential**: Model selection and coefficients (Tire: `Simple`, `PacejkaV1`, `PacejkaV2`).
+- **Sweep / Solver**: Diagram grid (steering & slip ranges, speed) and solver tolerances.
+- **Longitudinal / Refine / YawZero**: Coupled longitudinal solve, adaptive refinement, and yaw-zero trim-locus tracing.
+
+See **[docs/configuration.md](docs/configuration.md)** for every option with its unit, default and effect.
 
 ## Output
 
