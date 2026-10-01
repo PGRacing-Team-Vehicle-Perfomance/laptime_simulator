@@ -91,31 +91,22 @@ std::unique_ptr<DifferentialBase<VehicleFrame>> Simulation::buildDifferential(Co
 }
 
 template <typename Frame>
-std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
+std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     Vehicle<Frame>& v, float speed, const Config& cfg, float maxSteeringAngle,
     float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance,
     int maxIterations) {
     v.setSpeed(speed);
 
-    struct Sample {
-        float steering;
-        float slip;
-        float latAcc;
-        float yawMoment;
-        bool inSteeringFamily;
-        bool inSlipFamily;
-    };
-
     auto solveAt = [&](float steering, float slip, bool inSteer, bool inSlip) {
         v.setSteeringAngle(Alpha<Frame>(steering * M_PI / 180.f));
         v.setChassisSlipAngle(Alpha<Frame>(slip * M_PI / 180.f));
-        std::array<float, 2> point = v.calculateLatAccAndYawMoment(tolerance, maxIterations, cfg);
-        return Sample{steering, slip, point[0], point[1], inSteer, inSlip};
+        PointSolution solution = v.solveDiagramPoint(tolerance, maxIterations, cfg);
+        return DiagramSample{steering, slip, inSteer, inSlip, solution};
     };
 
-    std::vector<std::pair<float, std::vector<Sample>>> isolines;
+    std::vector<std::pair<float, std::vector<DiagramSample>>> isolines;
     auto sweepSteering = [&](float steeringAngle) {
-        std::vector<Sample> samples;
+        std::vector<DiagramSample> samples;
         for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
             samples.push_back(solveAt(steeringAngle, slip, true, true));
         }
@@ -127,35 +118,37 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
         sweepSteering(steeringAngle);
     }
 
-    std::vector<Sample> steeringRefined;
+    std::vector<DiagramSample> steeringRefined;
     bool refine = cfg.get("Simlation", "refine", 1.0f) > 0.5f;
     if (refine) {
         float latMin = 1e30f, latMax = -1e30f, yawMin = 1e30f, yawMax = -1e30f;
         for (auto& [steering, samples] : isolines) {
-            for (const Sample& s : samples) {
-                latMin = std::min(latMin, s.latAcc);
-                latMax = std::max(latMax, s.latAcc);
-                yawMin = std::min(yawMin, s.yawMoment);
-                yawMax = std::max(yawMax, s.yawMoment);
+            for (const DiagramSample& s : samples) {
+                latMin = std::min(latMin, s.solution.latAcc);
+                latMax = std::max(latMax, s.solution.latAcc);
+                yawMin = std::min(yawMin, s.solution.yawMoment);
+                yawMax = std::max(yawMax, s.solution.yawMoment);
             }
         }
         float latRange = std::max(1e-6f, latMax - latMin);
         float yawRange = std::max(1e-6f, yawMax - yawMin);
-        auto distance = [&](const Sample& a, const Sample& b) {
-            float dl = (a.latAcc - b.latAcc) / latRange;
-            float dy = (a.yawMoment - b.yawMoment) / yawRange;
+        auto distance = [&](const DiagramSample& a, const DiagramSample& b) {
+            float dl = (a.solution.latAcc - b.solution.latAcc) / latRange;
+            float dy = (a.solution.yawMoment - b.solution.yawMoment) / yawRange;
             return std::sqrt(dl * dl + dy * dy);
         };
 
-        std::map<long, std::vector<Sample>> baseBySlip;
+        std::map<long, std::vector<DiagramSample>> baseBySlip;
         for (auto& [steering, samples] : isolines) {
-            for (const Sample& s : samples) {
+            for (const DiagramSample& s : samples) {
                 baseBySlip[std::lround(s.slip / slipAngleStep)].push_back(s);
             }
         }
         for (auto& [key, group] : baseBySlip) {
             std::sort(group.begin(), group.end(),
-                      [](const Sample& a, const Sample& b) { return a.steering < b.steering; });
+                      [](const DiagramSample& a, const DiagramSample& b) {
+                          return a.steering < b.steering;
+                      });
         }
 
         std::vector<float> gaps;
@@ -174,25 +167,28 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
         float target = cfg.get("Simlation", "refineFactor", 1.5f) * median;
         int maxDepth = (int)cfg.get("Simlation", "refineMaxDepth", 4.0f);
 
-        std::function<void(const Sample&, const Sample&, int,
-                           const std::function<Sample(const Sample&, const Sample&)>&,
-                           std::vector<Sample>&)>
-            bisect = [&](const Sample& left, const Sample& right, int depth,
-                         const std::function<Sample(const Sample&, const Sample&)>& solveMid,
-                         std::vector<Sample>& into) -> void {
+        std::function<void(
+            const DiagramSample&, const DiagramSample&, int,
+            const std::function<DiagramSample(const DiagramSample&, const DiagramSample&)>&,
+            std::vector<DiagramSample>&)>
+            bisect =
+                [&](const DiagramSample& left, const DiagramSample& right, int depth,
+                    const std::function<DiagramSample(const DiagramSample&, const DiagramSample&)>&
+                        solveMid,
+                    std::vector<DiagramSample>& into) -> void {
             if (depth <= 0 || distance(left, right) <= target) return;
-            Sample mid = solveMid(left, right);
+            DiagramSample mid = solveMid(left, right);
             bisect(left, mid, depth - 1, solveMid, into);
             into.push_back(mid);
             bisect(mid, right, depth - 1, solveMid, into);
         };
 
-        std::function<Sample(const Sample&, const Sample&)> slipMid = [&](const Sample& l,
-                                                                          const Sample& r) {
-            return solveAt(l.steering, 0.5f * (l.slip + r.slip), true, false);
-        };
+        std::function<DiagramSample(const DiagramSample&, const DiagramSample&)> slipMid =
+            [&](const DiagramSample& l, const DiagramSample& r) {
+                return solveAt(l.steering, 0.5f * (l.slip + r.slip), true, false);
+            };
         for (auto& [steering, samples] : isolines) {
-            std::vector<Sample> refined{samples[0]};
+            std::vector<DiagramSample> refined{samples[0]};
             for (size_t i = 1; i < samples.size(); i++) {
                 bisect(samples[i - 1], samples[i], maxDepth, slipMid, refined);
                 refined.push_back(samples[i]);
@@ -200,10 +196,10 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
             samples = std::move(refined);
         }
 
-        std::function<Sample(const Sample&, const Sample&)> steeringMid = [&](const Sample& l,
-                                                                              const Sample& r) {
-            return solveAt(0.5f * (l.steering + r.steering), l.slip, false, true);
-        };
+        std::function<DiagramSample(const DiagramSample&, const DiagramSample&)> steeringMid =
+            [&](const DiagramSample& l, const DiagramSample& r) {
+                return solveAt(0.5f * (l.steering + r.steering), l.slip, false, true);
+            };
         for (auto& [key, group] : baseBySlip) {
             for (size_t i = 1; i < group.size(); i++) {
                 bisect(group[i - 1], group[i], maxDepth, steeringMid, steeringRefined);
@@ -211,23 +207,61 @@ std::vector<std::array<float, 6>> Simulation::getYawMomentDiagramPoints(
         }
     }
 
-    std::vector<std::array<float, 6>> out;
-    auto emit = [&](const Sample& s) {
-        out.push_back({s.steering, s.slip, s.latAcc, s.yawMoment, s.inSteeringFamily ? 1.0f : 0.0f,
-                       s.inSlipFamily ? 1.0f : 0.0f});
-    };
+    std::vector<DiagramSample> out;
     for (auto& [steering, samples] : isolines) {
-        for (const Sample& s : samples) emit(s);
+        for (const DiagramSample& s : samples) out.push_back(s);
     }
-    for (const Sample& s : steeringRefined) emit(s);
+    for (const DiagramSample& s : steeringRefined) out.push_back(s);
 
-    std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) {
-        return a[0] != b[0] ? a[0] < b[0] : a[1] < b[1];
+    std::sort(out.begin(), out.end(), [](const DiagramSample& a, const DiagramSample& b) {
+        return a.steering != b.steering ? a.steering < b.steering : a.slip < b.slip;
     });
     return out;
 }
 
-std::vector<std::array<float, 6>> Simulation::run() {
+namespace {
+struct TireColumn {
+    const char* name;
+    WheelData<float> PointSolution::* field;
+};
+
+constexpr TireColumn TIRE_COLUMNS[] = {
+    {"load", &PointSolution::load},           {"slipAngle", &PointSolution::slipAngle},
+    {"slipRatio", &PointSolution::slipRatio}, {"Fx", &PointSolution::forceX},
+    {"Fy", &PointSolution::forceY},           {"Mz", &PointSolution::momentZ},
+    {"camber", &PointSolution::camber},       {"aeroLoad", &PointSolution::aeroLoad},
+};
+
+constexpr const char* WHEEL_SUFFIX[CarConstants::WHEEL_COUNT] = {"FL", "FR", "RL", "RR"};
+}  // namespace
+
+void writeDiagramHeader(FILE* f) {
+    fprintf(f,
+            "steering,slip,latAcc,yawMoment,baseSteering,baseSlip,longAcc,aeroDownforce,aeroDrag,"
+            "totalLoad");
+    for (const TireColumn& column : TIRE_COLUMNS) {
+        for (const char* suffix : WHEEL_SUFFIX) {
+            fprintf(f, ",%s_%s", column.name, suffix);
+        }
+    }
+    fprintf(f, "\n");
+}
+
+void writeDiagramRow(FILE* f, const DiagramSample& sample) {
+    const PointSolution& p = sample.solution;
+    fprintf(f, "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", sample.steering, sample.slip, p.latAcc, p.yawMoment,
+            sample.inSteeringFamily ? 1.0f : 0.0f, sample.inSlipFamily ? 1.0f : 0.0f, p.longAcc,
+            p.aeroDownforce, p.aeroDrag, p.totalLoad);
+    for (const TireColumn& column : TIRE_COLUMNS) {
+        const WheelData<float>& wheels = p.*(column.field);
+        for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+            fprintf(f, ",%f", wheels[i]);
+        }
+    }
+    fprintf(f, "\n");
+}
+
+std::vector<DiagramSample> Simulation::run() {
     std::string vehicleFrameStr = cfg.getString("Vehicle", "frame");
 
     if (vehicleFrameStr == "ISO8855") {

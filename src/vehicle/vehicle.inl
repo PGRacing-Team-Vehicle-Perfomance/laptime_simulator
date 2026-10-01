@@ -186,6 +186,9 @@ void Vehicle<Frame>::computeTireForces(const WheelData<float>& loads,
         step.tireForcesY[i] = tires[i].value->getForce().value.y;
         step.tireMomentsZ[i] = tires[i].value->getTorque().z;
     }
+
+    step.loads = loads;
+    step.slipRatios = slipRatio;
 }
 
 template <typename Frame>
@@ -380,8 +383,8 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveLatAcc(const Config& co
 }
 
 template <typename Frame>
-std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance, int maxIterations,
-                                                                 const Config& config) {
+PointSolution Vehicle<Frame>::solveDiagramPoint(float tolerance, int maxIterations,
+                                                const Config& config) {
     SolverStep step;
     if (longEquilibriumEnabled) {
         step = solveCoupled(config, tolerance, maxIterations);
@@ -398,8 +401,7 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance
         maxSlip = std::max(maxSlip, std::abs(solutionSlipAngles[i].v));
     }
     if (maxSlip > tireCalibrationSlip) {
-        float nan = std::numeric_limits<float>::quiet_NaN();
-        return {nan, nan};
+        return invalidSolution();
     }
 
     float yawMomentFromTires = 0;
@@ -422,7 +424,53 @@ std::array<float, 2> Vehicle<Frame>::calculateLatAccAndYawMoment(float tolerance
 
     // TODO: aero yaw moment
     float yawMoment = yawMomentFromFy + yawMomentFromFx + yawMomentFromTires;
-    return {latAcc.v, yawMoment};
+    return assembleSolution(latAcc.v, yawMoment, step, solutionSlipAngles, config);
+}
+
+template <typename Frame>
+PointSolution Vehicle<Frame>::invalidSolution() {
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    WheelData<float> nanWheels{nan, nan, nan, nan};
+    return {nan,       nan,       nan,       nan,       nan,       nan,       nanWheels,
+            nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels, nanWheels};
+}
+
+template <typename Frame>
+PointSolution Vehicle<Frame>::assembleSolution(float latAcc, float yawMoment,
+                                               const typename Vehicle<Frame>::SolverStep& step,
+                                               const WheelData<Alpha<Frame>>& slipAngles,
+                                               const Config& config) {
+    constexpr float radToDeg = 180.0f / static_cast<float>(M_PI);
+    auto aeroLoads = aeroLoad(config);
+    float aeroDownforce = 0;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        aeroDownforce += aeroLoads[i];
+    }
+    Transform<Frame, ISO8855> toIso;
+    float aeroDrag = -toIso(aero.value->getForce().value.x).v;
+    float totalLoad = 0;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        totalLoad += step.loads[i];
+    }
+
+    PointSolution solution;
+    solution.latAcc = latAcc;
+    solution.yawMoment = yawMoment;
+    solution.longAcc = longitudinalAccEstimate;
+    solution.aeroDownforce = aeroDownforce;
+    solution.aeroDrag = aeroDrag;
+    solution.totalLoad = totalLoad;
+    for (size_t i = 0; i < CarConstants::WHEEL_COUNT; i++) {
+        solution.load[i] = step.loads[i];
+        solution.slipAngle[i] = slipAngles[i].v * radToDeg;
+        solution.slipRatio[i] = step.slipRatios[i];
+        solution.forceX[i] = step.tireForcesX[i].v;
+        solution.forceY[i] = step.tireForcesY[i].v;
+        solution.momentZ[i] = step.tireMomentsZ[i].v;
+        solution.camber[i] = camber[i].v * radToDeg;
+        solution.aeroLoad[i] = aeroLoads[i];
+    }
+    return solution;
 }
 
 template <typename Frame>

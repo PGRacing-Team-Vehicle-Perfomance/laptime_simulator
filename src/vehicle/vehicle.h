@@ -14,6 +14,23 @@
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
 
+struct PointSolution {
+    float latAcc;
+    float yawMoment;
+    float longAcc;
+    float aeroDownforce;
+    float aeroDrag;
+    float totalLoad;
+    WheelData<float> load;
+    WheelData<float> slipAngle;
+    WheelData<float> slipRatio;
+    WheelData<float> forceX;
+    WheelData<float> forceY;
+    WheelData<float> momentZ;
+    WheelData<float> camber;
+    WheelData<float> aeroLoad;
+};
+
 template <typename Frame>
 class Vehicle {
     Mass<Frame> combinedTotalMass;
@@ -64,6 +81,8 @@ class Vehicle {
         WheelData<X<Frame>> tireForcesX;
         WheelData<Y<Frame>> tireForcesY;
         WheelData<Z<Frame>> tireMomentsZ;
+        WheelData<float> loads;
+        WheelData<float> slipRatios;
     };
 
     WheelData<Alpha<Frame>> calculateSlipAngles();
@@ -100,6 +119,9 @@ class Vehicle {
     WheelData<Y<Frame>> getVelocityFyFromTireForces(const WheelData<X<Frame>>& tireFx,
                                                     const WheelData<Y<Frame>>& tireFy);
     SolverStep evaluateAt(Y<Frame> testLatAcc, const Config& config);
+    PointSolution invalidSolution();
+    PointSolution assembleSolution(float latAcc, float yawMoment, const SolverStep& step,
+                                   const WheelData<Alpha<Frame>>& slipAngles, const Config& config);
 
    public:
     Vehicle(const Config& config,
@@ -112,8 +134,7 @@ class Vehicle {
     void setSteeringAngle(Alpha<Frame> steeringAngle);
     void setSpeed(float speed);
 
-    std::array<float, 2> calculateLatAccAndYawMoment(float tolerance, int maxIterations,
-                                                     const Config& config);
+    PointSolution solveDiagramPoint(float tolerance, int maxIterations, const Config& config);
 };
 
 #include "vehicle.inl"
