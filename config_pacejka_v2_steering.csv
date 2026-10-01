@@ -180,3 +180,10 @@ Longitudinal,targetAcc,0.0
 Refine,enabled,true
 Refine,factor,1.5
 Refine,maxDepth,4
+YawZero,enabled,false
+YawZero,scanStep,2
+YawZero,rootFinder,anderson
+YawZero,slipTolerance,0.01
+YawZero,maxBisect,40
+YawZero,residualTolerance,50
+YawZero,mergeRadius,0.02
