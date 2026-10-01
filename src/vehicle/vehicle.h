@@ -69,6 +69,13 @@ class Vehicle {
 
     float longitudinalAccEstimate = 0;
 
+    // previous solve's operating point, reused to seed the next (serial use only)
+    bool warmStartEnabled = false;
+    bool warmStartValid = false;
+    float warmLatAcc = 0;
+    float warmDemand = 0;
+    float warmLongAcc = 0;
+
     VehicleState<Frame> state;
 
     Positioned<std::unique_ptr<AeroBase<Frame>>, Frame> aero;
@@ -107,6 +114,7 @@ class Vehicle {
                             int maxIterations);
     SolverStep solveLatAcc(const Config& config, float tolerance, int maxIterations);
     SolverStep solveCoupled(const Config& config, float tolerance, int maxIterations);
+    SolverStep solveCoupledRelaxed(const Config& config, float tolerance, int maxIterations);
     void computeTireForces(const WheelData<float>& loads, const WheelData<Alpha<Frame>>& slipAngles,
                            SolverStep& step);
     WheelData<float> distributeForces(float totalForce, float frontDist, float leftDist);
@@ -139,7 +147,15 @@ class Vehicle {
 
     PointSolution solveDiagramPoint(float tolerance, int maxIterations, const Config& config);
 
+    // warm-start the coupled solve from the previous point; serial use only (first is cold)
+    void setWarmStart(bool enabled);
+
     size_t solverEvaluations = 0;
+    // coupled-solver profiling
+    size_t coupledCalls = 0;
+    size_t coupledOuterSweeps = 0;
+    size_t coupledNewtonIters = 0;
+    size_t coupledBisectFallbacks = 0;
     double loadSeconds = 0;
     double slipAngleSeconds = 0;
     double tireForceSeconds = 0;
