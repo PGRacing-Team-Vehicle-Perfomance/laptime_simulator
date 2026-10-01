@@ -228,7 +228,8 @@ struct TireColumn {
 constexpr TireColumn TIRE_COLUMNS[] = {
     {"load", &PointSolution::load},           {"slipAngle", &PointSolution::slipAngle},
     {"slipRatio", &PointSolution::slipRatio}, {"Fx", &PointSolution::forceX},
-    {"Fy", &PointSolution::forceY},           {"Mz", &PointSolution::momentZ},
+    {"Fy", &PointSolution::forceY},           {"FxCar", &PointSolution::forceXCar},
+    {"FyCar", &PointSolution::forceYCar},     {"Mz", &PointSolution::momentZ},
     {"camber", &PointSolution::camber},       {"aeroLoad", &PointSolution::aeroLoad},
 };
 
