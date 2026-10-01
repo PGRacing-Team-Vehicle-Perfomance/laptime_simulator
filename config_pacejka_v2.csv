@@ -46,8 +46,7 @@ Vehicle,camber.RL,0
 Vehicle,camber.RR,0
 Vehicle,driveBiasFront,0.0
 Vehicle,brakeBiasFront,0.6
-Vehicle,frontDiffLocking,1.0
-Vehicle,rearDiffLocking,1.0
+Differential,implementation,Open
 Aero,frame,ISO8855
 Aero,implementation,Simple
 Aero,cla,3.7

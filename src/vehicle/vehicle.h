@@ -9,6 +9,7 @@
 #include "config/config.h"
 #include "coordTypes.h"
 #include "vehicle/aero/aero.h"
+#include "vehicle/differential/differential.h"
 #include "vehicle/steering/steeringTable.h"
 #include "vehicle/tire/tire.h"
 #include "vehicle/vehicleHelper.h"
@@ -38,8 +39,6 @@ class Vehicle {
 
     float driveBiasFront = 0;
     float brakeBiasFront = 0;
-    float frontDiffLocking = 1;
-    float rearDiffLocking = 1;
     float dragCoefficientArea = 0;
     float airDensityValue = 0;
     bool longEquilibriumEnabled = false;
@@ -58,6 +57,8 @@ class Vehicle {
 
     WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>> tires;
 
+    std::unique_ptr<DifferentialBase<Frame>> differential;
+
     struct SolverStep {
         Y<Frame> latAcc;
         WheelData<X<Frame>> tireForcesX;
@@ -73,12 +74,11 @@ class Vehicle {
                                   const WheelData<Y<Frame>>& tireForcesY);
     X<Frame> calculateBodyLongAcc(const WheelData<X<Frame>>& tireForcesX,
                                   const WheelData<Y<Frame>>& tireForcesY);
-    float slipRatioForForce(size_t wheel, float load, Alpha<Frame> slipAngle, Gamma<Frame> camber,
-                            float targetFx);
-    float wheelLongSpeed(size_t wheel);
+    AxleWheel<Frame> axleWheel(size_t wheel, const WheelData<float>& loads,
+                               const WheelData<Alpha<Frame>>& slipAngles);
     void solveAxle(size_t leftWheel, size_t rightWheel, const WheelData<float>& loads,
-                   const WheelData<Alpha<Frame>>& slipAngles, float axleDemand, bool hasDiff,
-                   float locking, float& leftSlipRatio, float& rightSlipRatio);
+                   const WheelData<Alpha<Frame>>& slipAngles, float axleDemand,
+                   float& leftSlipRatio, float& rightSlipRatio);
     SolverStep bisectLatAcc(const Config& config, float maxLatAcc, float tolerance,
                             int maxIterations);
     SolverStep bisectDemand(const Config& config, float maxForce, float maxLatAcc, float tolerance,
@@ -105,7 +105,8 @@ class Vehicle {
     Vehicle(const Config& config,
             WheelData<Positioned<std::unique_ptr<TireBase<Frame>>, Frame>>&& tires,
             Positioned<std::unique_ptr<AeroBase<Frame>>, Frame>&& aero,
-            std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable);
+            std::unique_ptr<SteeringTableBase<Frame>>&& steeringTable,
+            std::unique_ptr<DifferentialBase<Frame>>&& differential);
 
     void setChassisSlipAngle(Alpha<Frame> chassisSlipAngle);
     void setSteeringAngle(Alpha<Frame> steeringAngle);
