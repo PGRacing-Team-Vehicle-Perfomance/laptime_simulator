@@ -61,6 +61,17 @@ DIRECTION_SIGNS = {
 MONTAGE_TYPES = ISOLINE_MONTAGE_TYPES + list(HEATMAP_MONTAGE_SPEC)
 
 
+def print_setup_progress(done, total):
+    width = 30
+    filled = int(width * done / total) if total else width
+    bar = "#" * filled + "-" * (width - filled)
+    pct = 100 * done / total if total else 100
+    sys.stderr.write(f"\r[setups]       [{bar}] {pct:3.0f}% ({done}/{total})")
+    if done >= total:
+        sys.stderr.write("\n")
+    sys.stderr.flush()
+
+
 def parse_knobs(args):
     knobs = []
     if args.spec:
@@ -539,13 +550,19 @@ def main():
         print(f"  {setup['name'] or config_name} done  (sim {sim_seconds:.1f}s, render {render_seconds:.1f}s)")
         return data
 
+    total = len(setups)
+    done = 0
     base_setup = next(s for s in setups if s["is_base"])
     base_data = process_setup(base_setup, None)
+    done += 1
+    print_setup_progress(done, total)
     base_csv = os.path.join(run_dir if single else os.path.join(run_dir, base_setup["name"]), "yaw_diagram.csv")
     for setup in setups:
         if setup is base_setup:
             continue
         process_setup(setup, base_data)
+        done += 1
+        print_setup_progress(done, total)
         shutil.copyfile(base_csv, os.path.join(run_dir, setup["name"], "baseline.csv"))
 
     if not single:

@@ -44,6 +44,17 @@ using Clock = std::chrono::steady_clock;
 double secondsSince(Clock::time_point start) {
     return std::chrono::duration<double>(Clock::now() - start).count();
 }
+
+void printProgressBar(const char* label, size_t done, size_t total) {
+    constexpr int width = 30;
+    float frac = total > 0 ? static_cast<float>(done) / static_cast<float>(total) : 1.0f;
+    int filled = static_cast<int>(frac * width);
+    fprintf(stderr, "\r[%-12s] ", label);
+    for (int i = 0; i < width; i++) fputc(i < filled ? '#' : '-', stderr);
+    fprintf(stderr, " %3.0f%% (%zu/%zu)", frac * 100.0f, done, total);
+    if (done >= total) fputc('\n', stderr);
+    fflush(stderr);
+}
 }  // namespace
 
 template <typename VehicleFrame>
@@ -151,6 +162,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
     auto tBaseStart = Clock::now();
     std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(steeringAngles.size());
     std::vector<double> lineSeconds(steeringAngles.size(), 0.0);
+    size_t baseDone = 0;
 #pragma omp parallel for schedule(dynamic)
     for (size_t line = 0; line < steeringAngles.size(); line++) {
         auto tLine = Clock::now();
@@ -162,6 +174,8 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         }
         isolines[line] = {steeringAngle, std::move(samples)};
         lineSeconds[line] = secondsSince(tLine);
+#pragma omp critical
+        printProgressBar("base sweep", ++baseDone, steeringAngles.size());
     }
     double baseSeconds = secondsSince(tBaseStart);
     size_t basePoints = 0;
@@ -239,6 +253,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         prepSeconds = secondsSince(tPrep);
 
         auto tSlip = Clock::now();
+        size_t slipDone = 0;
 #pragma omp parallel for schedule(dynamic)
         for (size_t line = 0; line < isolines.size(); line++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
@@ -249,6 +264,8 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
                 refined.push_back(samples[i]);
             }
             samples = std::move(refined);
+#pragma omp critical
+            printProgressBar("slip refine", ++slipDone, isolines.size());
         }
         slipRefineSeconds = secondsSince(tSlip);
         size_t afterSlip = 0;
@@ -265,6 +282,7 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             groups.push_back(&group);
         }
         std::vector<std::vector<DiagramSample>> refinedGroups(groups.size());
+        size_t steerDone = 0;
 #pragma omp parallel for schedule(dynamic)
         for (size_t g = 0; g < groups.size(); g++) {
             Vehicle<Frame>& v = *pool[workerIndex()];
@@ -272,6 +290,8 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             for (size_t i = 1; i < group.size(); i++) {
                 bisect(v, group[i - 1], group[i], maxDepth, steeringMid, refinedGroups[g]);
             }
+#pragma omp critical
+            printProgressBar("steer refine", ++steerDone, groups.size());
         }
         for (const std::vector<DiagramSample>& refined : refinedGroups) {
             for (const DiagramSample& s : refined) steeringRefined.push_back(s);
