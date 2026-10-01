@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdio>
+#include <functional>
+#include <memory>
 
 #include "config/config.h"
 #include "vehicle/vehicle.h"
@@ -32,11 +34,10 @@ class Simulation {
     template <typename VehicleFrame>
     std::unique_ptr<DifferentialBase<VehicleFrame>> buildDifferential(Config& cfg);
     template <typename Frame>
-    std::vector<DiagramSample> getYawMomentDiagramPoints(Vehicle<Frame>& v, float speed,
-                                                         const Config& cfg, float maxSteeringAngle,
-                                                         float steeringAngleStep,
-                                                         float maxSlipAngle, float slipAngleStep,
-                                                         float tolerance, int maxIterations);
+    std::vector<DiagramSample> getYawMomentDiagramPoints(
+        const std::function<std::unique_ptr<Vehicle<Frame>>()>& makeVehicle, float speed,
+        const Config& cfg, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle,
+        float slipAngleStep, float tolerance, int maxIterations);
 
    public:
     Simulation(Config config) : cfg(config) {}

@@ -4,6 +4,8 @@
 #include <cmath>
 #include <functional>
 #include <map>
+#include <memory>
+#include <vector>
 
 #include "vehicle/aero/aeroSimple.h"
 #include "vehicle/differential/differential.h"
@@ -13,6 +15,28 @@
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace {
+int workerCount() {
+#ifdef _OPENMP
+    return omp_get_max_threads();
+#else
+    return 1;
+#endif
+}
+
+int workerIndex() {
+#ifdef _OPENMP
+    return omp_get_thread_num();
+#else
+    return 0;
+#endif
+}
+}  // namespace
 
 template <typename VehicleFrame>
 WheelData<Positioned<std::unique_ptr<TireBase<VehicleFrame>>, VehicleFrame>> Simulation::buildTires(
@@ -92,30 +116,38 @@ std::unique_ptr<DifferentialBase<VehicleFrame>> Simulation::buildDifferential(Co
 
 template <typename Frame>
 std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
-    Vehicle<Frame>& v, float speed, const Config& cfg, float maxSteeringAngle,
-    float steeringAngleStep, float maxSlipAngle, float slipAngleStep, float tolerance,
-    int maxIterations) {
-    v.setSpeed(speed);
+    const std::function<std::unique_ptr<Vehicle<Frame>>()>& makeVehicle, float speed,
+    const Config& cfg, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle,
+    float slipAngleStep, float tolerance, int maxIterations) {
+    std::vector<std::unique_ptr<Vehicle<Frame>>> pool;
+    for (int i = 0; i < workerCount(); i++) {
+        pool.push_back(makeVehicle());
+        pool.back()->setSpeed(speed);
+    }
 
-    auto solveAt = [&](float steering, float slip, bool inSteer, bool inSlip) {
+    auto solveAt = [&](Vehicle<Frame>& v, float steering, float slip, bool inSteer, bool inSlip) {
         v.setSteeringAngle(Alpha<Frame>(steering * M_PI / 180.f));
         v.setChassisSlipAngle(Alpha<Frame>(slip * M_PI / 180.f));
         PointSolution solution = v.solveDiagramPoint(tolerance, maxIterations, cfg);
         return DiagramSample{steering, slip, inSteer, inSlip, solution};
     };
 
-    std::vector<std::pair<float, std::vector<DiagramSample>>> isolines;
-    auto sweepSteering = [&](float steeringAngle) {
-        std::vector<DiagramSample> samples;
-        for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
-            samples.push_back(solveAt(steeringAngle, slip, true, true));
-        }
-        isolines.push_back({steeringAngle, std::move(samples)});
-    };
-
+    std::vector<float> steeringAngles;
     for (float steeringAngle = -maxSteeringAngle; steeringAngle <= maxSteeringAngle;
          steeringAngle += steeringAngleStep) {
-        sweepSteering(steeringAngle);
+        steeringAngles.push_back(steeringAngle);
+    }
+
+    std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(steeringAngles.size());
+#pragma omp parallel for schedule(dynamic)
+    for (size_t line = 0; line < steeringAngles.size(); line++) {
+        Vehicle<Frame>& v = *pool[workerIndex()];
+        float steeringAngle = steeringAngles[line];
+        std::vector<DiagramSample> samples;
+        for (float slip = -maxSlipAngle; slip <= maxSlipAngle; slip += slipAngleStep) {
+            samples.push_back(solveAt(v, steeringAngle, slip, true, true));
+        }
+        isolines[line] = {steeringAngle, std::move(samples)};
     }
 
     std::vector<DiagramSample> steeringRefined;
@@ -167,43 +199,54 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
         float target = cfg.get("Simlation", "refineFactor", 1.5f) * median;
         int maxDepth = (int)cfg.get("Simlation", "refineMaxDepth", 4.0f);
 
-        std::function<void(
-            const DiagramSample&, const DiagramSample&, int,
-            const std::function<DiagramSample(const DiagramSample&, const DiagramSample&)>&,
-            std::vector<DiagramSample>&)>
-            bisect =
-                [&](const DiagramSample& left, const DiagramSample& right, int depth,
-                    const std::function<DiagramSample(const DiagramSample&, const DiagramSample&)>&
-                        solveMid,
-                    std::vector<DiagramSample>& into) -> void {
+        using MidSolver = std::function<DiagramSample(Vehicle<Frame>&, const DiagramSample&,
+                                                      const DiagramSample&)>;
+        std::function<void(Vehicle<Frame>&, const DiagramSample&, const DiagramSample&, int,
+                           const MidSolver&, std::vector<DiagramSample>&)>
+            bisect = [&](Vehicle<Frame>& v, const DiagramSample& left, const DiagramSample& right,
+                         int depth, const MidSolver& solveMid,
+                         std::vector<DiagramSample>& into) -> void {
             if (depth <= 0 || distance(left, right) <= target) return;
-            DiagramSample mid = solveMid(left, right);
-            bisect(left, mid, depth - 1, solveMid, into);
+            DiagramSample mid = solveMid(v, left, right);
+            bisect(v, left, mid, depth - 1, solveMid, into);
             into.push_back(mid);
-            bisect(mid, right, depth - 1, solveMid, into);
+            bisect(v, mid, right, depth - 1, solveMid, into);
         };
 
-        std::function<DiagramSample(const DiagramSample&, const DiagramSample&)> slipMid =
-            [&](const DiagramSample& l, const DiagramSample& r) {
-                return solveAt(l.steering, 0.5f * (l.slip + r.slip), true, false);
-            };
-        for (auto& [steering, samples] : isolines) {
+        MidSolver slipMid = [&](Vehicle<Frame>& v, const DiagramSample& l, const DiagramSample& r) {
+            return solveAt(v, l.steering, 0.5f * (l.slip + r.slip), true, false);
+        };
+#pragma omp parallel for schedule(dynamic)
+        for (size_t line = 0; line < isolines.size(); line++) {
+            Vehicle<Frame>& v = *pool[workerIndex()];
+            std::vector<DiagramSample>& samples = isolines[line].second;
             std::vector<DiagramSample> refined{samples[0]};
             for (size_t i = 1; i < samples.size(); i++) {
-                bisect(samples[i - 1], samples[i], maxDepth, slipMid, refined);
+                bisect(v, samples[i - 1], samples[i], maxDepth, slipMid, refined);
                 refined.push_back(samples[i]);
             }
             samples = std::move(refined);
         }
 
-        std::function<DiagramSample(const DiagramSample&, const DiagramSample&)> steeringMid =
-            [&](const DiagramSample& l, const DiagramSample& r) {
-                return solveAt(0.5f * (l.steering + r.steering), l.slip, false, true);
-            };
+        MidSolver steeringMid = [&](Vehicle<Frame>& v, const DiagramSample& l,
+                                    const DiagramSample& r) {
+            return solveAt(v, 0.5f * (l.steering + r.steering), l.slip, false, true);
+        };
+        std::vector<std::vector<DiagramSample>*> groups;
         for (auto& [key, group] : baseBySlip) {
+            groups.push_back(&group);
+        }
+        std::vector<std::vector<DiagramSample>> refinedGroups(groups.size());
+#pragma omp parallel for schedule(dynamic)
+        for (size_t g = 0; g < groups.size(); g++) {
+            Vehicle<Frame>& v = *pool[workerIndex()];
+            std::vector<DiagramSample>& group = *groups[g];
             for (size_t i = 1; i < group.size(); i++) {
-                bisect(group[i - 1], group[i], maxDepth, steeringMid, steeringRefined);
+                bisect(v, group[i - 1], group[i], maxDepth, steeringMid, refinedGroups[g]);
             }
+        }
+        for (const std::vector<DiagramSample>& refined : refinedGroups) {
+            for (const DiagramSample& s : refined) steeringRefined.push_back(s);
         }
     }
 
@@ -267,30 +310,28 @@ std::vector<DiagramSample> Simulation::run() {
 
     if (vehicleFrameStr == "ISO8855") {
         using VehicleFrame = ISO8855;
-        auto tires = buildTires<VehicleFrame>(cfg);
-        auto aero = buildAero<VehicleFrame>(cfg);
-        auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
-        auto differential = buildDifferential<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable),
-                                std::move(differential));
-        return getYawMomentDiagramPoints(
-            v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"),
-            cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"),
-            cfg.get("Simlation", "slipAngleStep"), cfg.get("Simlation", "tolerance"),
-            cfg.get("Simlation", "maxIterations"));
+        auto makeVehicle = [this]() {
+            return std::make_unique<Vehicle<VehicleFrame>>(
+                cfg, buildTires<VehicleFrame>(cfg), buildAero<VehicleFrame>(cfg),
+                buildSteeringTable<VehicleFrame>(cfg), buildDifferential<VehicleFrame>(cfg));
+        };
+        return getYawMomentDiagramPoints<VehicleFrame>(
+            makeVehicle, cfg.get("Simlation", "speed"), cfg,
+            cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"),
+            cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"),
+            cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
     } else if (vehicleFrameStr == "SAE") {
         using VehicleFrame = SAE;
-        auto tires = buildTires<VehicleFrame>(cfg);
-        auto aero = buildAero<VehicleFrame>(cfg);
-        auto steeringTable = buildSteeringTable<VehicleFrame>(cfg);
-        auto differential = buildDifferential<VehicleFrame>(cfg);
-        Vehicle<VehicleFrame> v(cfg, std::move(tires), std::move(aero), std::move(steeringTable),
-                                std::move(differential));
-        return getYawMomentDiagramPoints(
-            v, cfg.get("Simlation", "speed"), cfg, cfg.get("Simlation", "maxSteeringAngle"),
-            cfg.get("Simlation", "steeringAngleStep"), cfg.get("Simlation", "maxSlipAngle"),
-            cfg.get("Simlation", "slipAngleStep"), cfg.get("Simlation", "tolerance"),
-            cfg.get("Simlation", "maxIterations"));
+        auto makeVehicle = [this]() {
+            return std::make_unique<Vehicle<VehicleFrame>>(
+                cfg, buildTires<VehicleFrame>(cfg), buildAero<VehicleFrame>(cfg),
+                buildSteeringTable<VehicleFrame>(cfg), buildDifferential<VehicleFrame>(cfg));
+        };
+        return getYawMomentDiagramPoints<VehicleFrame>(
+            makeVehicle, cfg.get("Simlation", "speed"), cfg,
+            cfg.get("Simlation", "maxSteeringAngle"), cfg.get("Simlation", "steeringAngleStep"),
+            cfg.get("Simlation", "maxSlipAngle"), cfg.get("Simlation", "slipAngleStep"),
+            cfg.get("Simlation", "tolerance"), cfg.get("Simlation", "maxIterations"));
     } else {
         throw std::runtime_error("Unknown vehicle frame: " + vehicleFrameStr);
     }

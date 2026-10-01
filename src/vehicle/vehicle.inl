@@ -489,7 +489,10 @@ void Vehicle<Frame>::setSteeringAngle(Alpha<Frame> steeringAngle) {
 
 template <typename Frame>
 void Vehicle<Frame>::setChassisSlipAngle(Alpha<Frame> chassisSlipAngle) {
-    float speed = state.velocity.getLength();
+    // Use the stored speed rather than re-deriving it from the current velocity:
+    // rotating the vector in float drifts its length by ~1 ulp each call, and that
+    // drift accumulates across the points a reused vehicle solves (nondeterministic
+    // under the parallel schedule).
     state.velocity.x = X<Frame>{speed * std::cos(chassisSlipAngle.v)};
     state.velocity.y = Y<Frame>{speed * std::sin(chassisSlipAngle.v)};
     state.velocity.z = Z<Frame>(0);
@@ -497,6 +500,7 @@ void Vehicle<Frame>::setChassisSlipAngle(Alpha<Frame> chassisSlipAngle) {
 
 template <typename Frame>
 void Vehicle<Frame>::setSpeed(float speed) {
+    this->speed = speed;
     state.velocity.setLength(speed);
 }
 

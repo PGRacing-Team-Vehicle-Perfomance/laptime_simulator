@@ -56,6 +56,7 @@ class Vehicle {
     WheelData<Alpha<Frame>> toeAngle;
     WheelData<Gamma<Frame>> camber;
 
+    float speed = 0;
     float driveBiasFront = 0;
     float brakeBiasFront = 0;
     float dragCoefficientArea = 0;
