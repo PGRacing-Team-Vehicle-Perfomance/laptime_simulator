@@ -16,6 +16,13 @@ import matplotlib.image as mpimg
 from matplotlib.colors import Normalize
 
 from plot_yaw_diagram import read_csv, render_isoline_figures, save_figures
+from diagram_metrics import (
+    read_metrics_csv,
+    read_hull_csv,
+    render_metrics_figure,
+    write_metrics_summary_csv,
+    render_metrics_summary_figures,
+)
 from derivatives import (
     render_derivative_figures,
     render_diff_figures,
@@ -47,9 +54,14 @@ HEATMAP_MONTAGE_SPEC = {
 }
 
 
-TOE_WHEELS = {
-    "front": (("toeAngle.FL", 1.0), ("toeAngle.FR", 1.0)),
-    "rear": (("toeAngle.RL", 1.0), ("toeAngle.RR", 1.0)),
+TOE_KEYS = {
+    "front": ["Vehicle.toeAngle.FL", "Vehicle.toeAngle.FR"],
+    "rear": ["Vehicle.toeAngle.RL", "Vehicle.toeAngle.RR"],
+}
+
+SUSPENDED_MASS_KEYS = {
+    "front": ["Vehicle.suspendedMassAtWheels.FL", "Vehicle.suspendedMassAtWheels.FR"],
+    "rear": ["Vehicle.suspendedMassAtWheels.RL", "Vehicle.suspendedMassAtWheels.RR"],
 }
 
 DIRECTION_SIGNS = {
@@ -70,31 +82,6 @@ def print_setup_progress(done, total):
     if done >= total:
         sys.stderr.write("\n")
     sys.stderr.flush()
-
-
-def parse_knobs(args):
-    knobs = []
-    if args.spec:
-        with open(args.spec, newline="") as f:
-            for row in csv.DictReader(f):
-                knobs.append(
-                    {
-                        "param": row["param"].strip(),
-                        "delta": float(row["delta"]),
-                        "direction": row["direction"].strip(),
-                        "axle": row["axle"].strip(),
-                    }
-                )
-    if args.delta is not None:
-        knobs.append(
-            {
-                "param": args.param,
-                "delta": args.delta,
-                "direction": args.direction,
-                "axle": args.axle,
-            }
-        )
-    return knobs
 
 
 def read_config_lines(path):
@@ -122,68 +109,8 @@ def apply_overrides(lines, overrides):
     return result
 
 
-def base_toe_values(config_path):
-    values = {}
-    for row in csv.reader(open(config_path, newline="")):
-        if len(row) >= 3 and row[0] == "Vehicle" and row[1].startswith("toeAngle."):
-            try:
-                values[row[1]] = float(row[2])
-            except ValueError:
-                pass
-    return values
-
-
 def format_delta(value):
     return f"{'+' if value >= 0 else '-'}{abs(value):g}"
-
-
-def axle_toe_overrides(base_toe, axle, delta):
-    overrides = {}
-    for wheel_param, wheel_sign in TOE_WHEELS[axle]:
-        overrides[f"Vehicle.{wheel_param}"] = base_toe.get(wheel_param, 0.0) + wheel_sign * delta
-    return overrides
-
-
-def axle_levels(knobs, axle):
-    levels = {0.0}
-    for knob in knobs:
-        if knob["param"] != "toe":
-            raise ValueError(f"unsupported param '{knob['param']}' (only 'toe' for now)")
-        if knob["axle"] in (axle, "both"):
-            for sign in DIRECTION_SIGNS[knob["direction"]]:
-                levels.add(round(sign * knob["delta"], 6))
-    return sorted(levels)
-
-
-def build_setups(knobs, base_toe):
-    front_levels = axle_levels(knobs, "front")
-    rear_levels = axle_levels(knobs, "rear")
-    setups = []
-    index = 0
-    for rear_delta in rear_levels:
-        for front_delta in front_levels:
-            overrides = {}
-            overrides.update(axle_toe_overrides(base_toe, "front", front_delta))
-            overrides.update(axle_toe_overrides(base_toe, "rear", rear_delta))
-            tags = []
-            if front_delta != 0.0:
-                tags.append(f"f{format_delta(front_delta)}")
-            if rear_delta != 0.0:
-                tags.append(f"r{format_delta(rear_delta)}")
-            slug = "base" if not tags else "_".join(tags)
-            label = "base" if not tags else f"F {format_delta(front_delta)} / R {format_delta(rear_delta)}"
-            setups.append(
-                {
-                    "name": f"setup_{index:02d}_{slug}",
-                    "label": label,
-                    "col": front_delta,
-                    "row": rear_delta,
-                    "is_base": not tags,
-                    "overrides": overrides,
-                }
-            )
-            index += 1
-    return setups
 
 
 def config_value(config_path, key):
@@ -209,60 +136,84 @@ def list_axle_pairs(config_path):
     return sorted(fronts & rears)
 
 
-def sweep_values(base_value, args):
+def axle_key_groups(param):
+    if param == "toe":
+        return TOE_KEYS["front"], TOE_KEYS["rear"]
+    return [f"Vehicle.front{param}"], [f"Vehicle.rear{param}"]
+
+
+def sweep_mode_levels(args):
     if args.values:
-        return [float(v) for v in args.values.split(",")]
+        return "abs", [float(v) for v in args.values.split(",")]
     if args.percent:
-        return [base_value * (1.0 + float(p) / 100.0) for p in args.percent.split(",")]
+        return "percent", [float(p) for p in args.percent.split(",")]
     if args.delta is not None:
-        return [base_value + sign * args.delta for sign in DIRECTION_SIGNS[args.direction]]
-    return []
+        return "delta", [sign * args.delta for sign in DIRECTION_SIGNS[args.direction]]
+    return "delta", []
 
 
-def apply_offset(base_value, offset, mode):
-    return base_value * (1.0 + offset / 100.0) if mode == "percent" else base_value + offset
+def level_value(base, mode, level):
+    if mode == "abs":
+        return level
+    if mode == "percent":
+        return base * (1.0 + level / 100.0)
+    return base + level
 
 
-def format_offset(offset, mode):
-    return f"{offset:+g}%" if mode == "percent" else format_delta(offset)
+def base_coord(base, mode):
+    return base if mode == "abs" else 0.0
 
 
-def pair_levels(args):
-    if args.percent:
-        offsets = {float(p) for p in args.percent.split(",")}
-        return sorted({0.0} | offsets), "percent"
-    if args.delta is not None:
-        offsets = {sign * args.delta for sign in DIRECTION_SIGNS[args.direction]}
-        return sorted({0.0} | offsets), "delta"
-    return [0.0], "delta"
+def format_level(coord, mode):
+    if mode == "percent":
+        return f"{coord:+g}%"
+    if mode == "delta":
+        return format_delta(coord)
+    return f"{coord:g}"
 
 
-def build_pair_setups(front_key, rear_key, base_front, base_rear, levels, mode, axle):
-    front_levels = levels if axle in ("front", "both") else [0.0]
-    rear_levels = levels if axle in ("rear", "both") else [0.0]
+def level_label(position, mode):
+    return "base" if position["is_base"] else format_level(position["coord"], mode)
+
+
+def axle_axis(keys, base, mode, levels, active):
+    positions = [{"coord": base_coord(base, mode), "overrides": {}, "is_base": True}]
+    if not active:
+        return positions
+    seen = {positions[0]["coord"]}
+    for level in levels:
+        value = level_value(base, mode, level)
+        if abs(value - base) < 1e-12 or level in seen:
+            continue
+        seen.add(level)
+        positions.append({"coord": level, "overrides": {k: value for k in keys}, "is_base": False})
+    return positions
+
+
+def build_axle_matrix_setups(front_keys, rear_keys, base_front, base_rear, mode, levels, axle):
+    front_axis = axle_axis(front_keys, base_front, mode, levels, axle in ("front", "both"))
+    rear_axis = axle_axis(rear_keys, base_rear, mode, levels, axle in ("rear", "both"))
     setups = []
     index = 0
-    for rear_offset in rear_levels:
-        for front_offset in front_levels:
-            overrides = {}
-            if front_offset != 0.0:
-                overrides[front_key] = apply_offset(base_front, front_offset, mode)
-            if rear_offset != 0.0:
-                overrides[rear_key] = apply_offset(base_rear, rear_offset, mode)
-            is_base = front_offset == 0.0 and rear_offset == 0.0
+    for rear_pos in rear_axis:
+        for front_pos in front_axis:
+            overrides = dict(front_pos["overrides"])
+            overrides.update(rear_pos["overrides"])
+            is_base = front_pos["is_base"] and rear_pos["is_base"]
             tags = []
-            if front_offset != 0.0:
-                tags.append(f"f{format_offset(front_offset, mode)}")
-            if rear_offset != 0.0:
-                tags.append(f"r{format_offset(rear_offset, mode)}")
+            if not front_pos["is_base"]:
+                tags.append(f"f{format_level(front_pos['coord'], mode)}")
+            if not rear_pos["is_base"]:
+                tags.append(f"r{format_level(rear_pos['coord'], mode)}")
             slug = "base" if is_base else "_".join(tags).replace("%", "pct")
-            label = "base" if is_base else f"F {format_offset(front_offset, mode)} / R {format_offset(rear_offset, mode)}"
+            label = "base" if is_base else \
+                f"F {level_label(front_pos, mode)} / R {level_label(rear_pos, mode)}"
             setups.append(
                 {
                     "name": f"setup_{index:02d}_{slug}",
                     "label": label,
-                    "col": front_offset,
-                    "row": rear_offset,
+                    "col": front_pos["coord"],
+                    "row": rear_pos["coord"],
                     "is_base": is_base,
                     "overrides": overrides,
                 }
@@ -291,6 +242,16 @@ def build_generic_setups(param_key, base_value, test_values):
     return setups
 
 
+def sweep_values(base_value, args):
+    if args.values:
+        return [float(v) for v in args.values.split(",")]
+    if args.percent:
+        return [base_value * (1.0 + float(p) / 100.0) for p in args.percent.split(",")]
+    if args.delta is not None:
+        return [base_value + sign * args.delta for sign in DIRECTION_SIGNS[args.direction]]
+    return []
+
+
 def build_config_setups(config_paths):
     setups = []
     for index, path in enumerate(config_paths):
@@ -311,26 +272,221 @@ def build_config_setups(config_paths):
 
 
 def build_all_setups(args, config_path):
-    if args.param == "toe":
-        setups = build_setups(parse_knobs(args), base_toe_values(config_path))
-        return setups, "front toe", "rear toe"
-    if "." not in args.param:
-        front_key = f"Vehicle.front{args.param}"
-        rear_key = f"Vehicle.rear{args.param}"
-        levels, mode = pair_levels(args)
-        setups = build_pair_setups(
-            front_key,
-            rear_key,
-            config_value(config_path, front_key),
-            config_value(config_path, rear_key),
-            levels,
+    mode, levels = sweep_mode_levels(args)
+    if args.param == "toe" or "." not in args.param:
+        front_keys, rear_keys = axle_key_groups(args.param)
+        setups = build_axle_matrix_setups(
+            front_keys,
+            rear_keys,
+            config_value(config_path, front_keys[0]),
+            config_value(config_path, rear_keys[0]),
             mode,
+            levels,
             args.axle,
         )
         return setups, f"front {args.param}", f"rear {args.param}"
     base_value = config_value(config_path, args.param)
     setups = build_generic_setups(args.param, base_value, sweep_values(base_value, args))
     return setups, args.param, None
+
+
+def read_oat_spec(path):
+    knobs = []
+    for row in csv.DictReader(open(path, newline="")):
+        param = (row.get("param") or "").strip()
+        keys = (row.get("keys") or "").strip()
+        if not param and not keys:
+            continue
+        knobs.append(
+            {
+                "param": param,
+                "keys": keys,
+                "keys_down": (row.get("keys_down") or "").strip(),
+                "label": (row.get("label") or "").strip(),
+                "values": (row.get("values") or "").strip(),
+                "percent": (row.get("percent") or "").strip(),
+                "delta": (row.get("delta") or "").strip(),
+                "direction": (row.get("direction") or "both").strip() or "both",
+                "axle": (row.get("axle") or "both").strip() or "both",
+            }
+        )
+    return knobs
+
+
+def knob_mode_levels(knob):
+    if knob["values"]:
+        return "abs", [float(v) for v in knob["values"].split(",")]
+    if knob["percent"]:
+        return "percent", [float(p) for p in knob["percent"].split(",")]
+    if knob["delta"]:
+        delta = float(knob["delta"])
+        return "delta", [sign * delta for sign in DIRECTION_SIGNS[knob["direction"]]]
+    return "delta", []
+
+
+def exact_knob_variations(param, mode, levels, config_path, label=None):
+    base = config_value(config_path, param)
+    name = label or param
+    variations = []
+    seen = set()
+    for level in levels:
+        value = level_value(base, mode, level)
+        if abs(value - base) < 1e-12 or value in seen:
+            continue
+        seen.add(value)
+        variations.append(
+            {
+                "slug": f"{slugify(name)}_{level_slug(level, mode)}",
+                "label": f"{name} = {value:g}",
+                "overrides": {param: value},
+            }
+        )
+    return variations
+
+
+def pair_knob_variations(param, axle, mode, levels, config_path, label=None):
+    front_keys, rear_keys = axle_key_groups(param)
+    name = label or param
+    variations = []
+    for side, keys in (("front", front_keys), ("rear", rear_keys)):
+        if axle not in (side, "both"):
+            continue
+        base = config_value(config_path, keys[0])
+        seen = set()
+        for level in levels:
+            value = level_value(base, mode, level)
+            if abs(value - base) < 1e-12 or value in seen:
+                continue
+            seen.add(value)
+            variations.append(
+                {
+                    "slug": f"{slugify(name)}_{side[0]}_{level_slug(level, mode)}",
+                    "label": f"{name} {side} = {value:g}",
+                    "overrides": {k: value for k in keys},
+                }
+            )
+    return variations
+
+
+def slugify(text):
+    out = "".join(c if c.isalnum() else "_" for c in text)
+    while "__" in out:
+        out = out.replace("__", "_")
+    return out.strip("_")
+
+
+def level_slug(level, mode):
+    magnitude = f"{abs(level):g}".replace(".", "_")
+    return f"{'m' if level < 0 else 'p'}{magnitude}{'pct' if mode == 'percent' else ''}"
+
+
+def group_knob_variations(knob, mode, levels, config_path):
+    up_keys = [key.strip() for key in knob["keys"].split(";") if key.strip()]
+    down_keys = [key.strip() for key in knob["keys_down"].split(";") if key.strip()]
+    bases = {key: config_value(config_path, key) for key in up_keys + down_keys}
+    label = knob["label"] or up_keys[0]
+    reference = bases[up_keys[0]]
+    variations = []
+    seen = set()
+    for level in levels:
+        if abs(level_value(reference, mode, level) - reference) < 1e-12 or level in seen:
+            continue
+        seen.add(level)
+        overrides = {key: level_value(bases[key], mode, level) for key in up_keys}
+        for key in down_keys:
+            if mode == "abs":
+                # mirror the up-side delta around this key's own base (there is no
+                # meaningful "opposite" of a raw absolute target otherwise)
+                overrides[key] = bases[key] - (level - reference)
+            else:
+                overrides[key] = level_value(bases[key], mode, -level)
+        tag = format_level(level, mode)
+        variations.append(
+            {
+                "slug": f"{slugify(label)}_{level_slug(level, mode)}",
+                "label": f"{label} {tag}",
+                "overrides": overrides,
+            }
+        )
+    return variations
+
+
+def balance_target(base_percent, mode, level):
+    return level if mode == "abs" else base_percent + level
+
+
+def balance_knob_variations(knob, mode, levels, config_path):
+    front_keys = SUSPENDED_MASS_KEYS["front"]
+    rear_keys = SUSPENDED_MASS_KEYS["rear"]
+    front_mass = {key: config_value(config_path, key) for key in front_keys}
+    rear_mass = {key: config_value(config_path, key) for key in rear_keys}
+    front_total = sum(front_mass.values())
+    rear_total = sum(rear_mass.values())
+    total = front_total + rear_total
+    base_front_percent = 100.0 * front_total / total
+    name = knob["label"] or "mass balance"
+    variations = []
+    seen = set()
+    for level in levels:
+        target = balance_target(base_front_percent, mode, level)
+        if abs(target - base_front_percent) < 1e-9 or round(target, 6) in seen:
+            continue
+        seen.add(round(target, 6))
+        new_front_total = total * target / 100.0
+        new_rear_total = total - new_front_total
+        overrides = {key: new_front_total * mass / front_total for key, mass in front_mass.items()}
+        overrides.update({key: new_rear_total * mass / rear_total for key, mass in rear_mass.items()})
+        variations.append(
+            {
+                "slug": f"{slugify(name)}_{level_slug(level, mode)}",
+                "label": f"{name} = {target:.1f}% front",
+                "overrides": overrides,
+            }
+        )
+    return variations
+
+
+def knob_variations(knob, config_path):
+    mode, levels = knob_mode_levels(knob)
+    if knob["keys"]:
+        return group_knob_variations(knob, mode, levels, config_path)
+    param = knob["param"]
+    label = knob["label"] or None
+    if param == "massBalance":
+        return balance_knob_variations(knob, mode, levels, config_path)
+    if param == "toe" or "." not in param:
+        return pair_knob_variations(param, knob["axle"], mode, levels, config_path, label)
+    return exact_knob_variations(param, mode, levels, config_path, label)
+
+
+def build_oat_setups(spec_path, config_path):
+    variations = []
+    for knob in read_oat_spec(spec_path):
+        variations.extend(knob_variations(knob, config_path))
+    ncols = max(1, int(round((len(variations) + 1) ** 0.5)))
+    setups = [
+        {
+            "name": "setup_00_base",
+            "label": "base",
+            "col": 0.0,
+            "row": 0.0,
+            "is_base": True,
+            "overrides": {},
+        }
+    ]
+    for offset, variation in enumerate(variations):
+        index = offset + 1
+        setups.append(
+            {
+                "name": f"setup_{index:02d}_{variation['slug']}",
+                "label": variation["label"],
+                "col": float(index % ncols),
+                "row": float(-(index // ncols)),
+                "is_base": False,
+                "overrides": variation["overrides"],
+            }
+        )
+    return setups, "one-at-a-time", None
 
 
 def next_run_dir(results_dir):
@@ -342,13 +498,20 @@ def next_run_dir(results_dir):
 
 
 def run_simulation(binary, config_path, repo_root):
-    output = os.path.join(repo_root, "build", "yaw_diagram.csv")
-    if os.path.exists(output):
-        os.remove(output)
+    build_dir = os.path.join(repo_root, "build")
+    outputs = [os.path.join(build_dir, name)
+               for name in ("yaw_diagram.csv", "metrics.csv", "hull.csv")]
+    # clear stale outputs first so a failed write can't silently reuse a prior
+    # setup's metrics/hull, and verify all three afterwards (an old binary that
+    # predates diagramMetrics fails fast with a clear message)
+    for path in outputs:
+        if os.path.exists(path):
+            os.remove(path)
     subprocess.run([binary, config_path], cwd=repo_root, check=True, stdout=subprocess.DEVNULL)
-    if not os.path.exists(output):
-        raise RuntimeError(f"simulator did not produce {output}")
-    return output
+    for path in outputs:
+        if not os.path.exists(path):
+            raise RuntimeError(f"simulator did not produce {path}")
+    return outputs[0]
 
 
 def render_setup(setup_dir, csv_path, title_prefix, base_data=None):
@@ -358,10 +521,13 @@ def render_setup(setup_dir, csv_path, title_prefix, base_data=None):
     derivatives = render_derivative_figures(data, title_prefix)
     save_figures(derivatives, setup_dir)
     write_enriched_csv(csv_path, data)
+    metrics = read_metrics_csv(os.path.join(setup_dir, "metrics.csv"))
+    hull = read_hull_csv(os.path.join(setup_dir, "hull.csv"))
+    save_figures({"metrics": render_metrics_figure(data, metrics, hull, title_prefix)}, setup_dir)
     if base_data is not None:
         diffs = render_diff_figures(data, base_data, title_prefix)
         save_figures(diffs, setup_dir)
-    return data
+    return data, metrics, hull
 
 
 def montage_axes_levels(setups):
@@ -450,6 +616,8 @@ how to control the sweep (with 'make setups SETUP_ARGS=\"...\"'):
     --param Vehicle.suspendedMassHeight
                            one exact config key, swept on its own (--axle ignored)
     --configs a,b,c        use whole config files as points (first is baseline)
+    --spec sweep.csv       one-at-a-time (OAT) study: each row is one param swept
+                           alone from baseline, no cross-product between rows
 
   how to build the range:
     --delta 0.2            baseline-0.2, baseline, baseline+0.2
@@ -460,11 +628,33 @@ how to control the sweep (with 'make setups SETUP_ARGS=\"...\"'):
     --axle front           for toe or a front/rear pair: change only the front
                            side (or rear / both, default both)
 
+  --spec CSV columns: param, one of values/percent/delta, and optional
+    direction (for delta) and axle (for toe or a front/rear pair). Example rows:
+      param,values,percent,delta,direction,axle
+      toe,\"0.8,-0.8\",,,,front
+      Karb,,\"-20,20\",,,rear
+      Vehicle.suspendedMassHeight,\"0.25,0.33\",,,,
+    Instead of param, a row may set 'keys' (';'-separated exact config keys) to
+    change several keys together in one setup, plus 'keys_down' for keys moved by
+    the opposite offset (e.g. a front/rear balance) and 'label' for the display
+    name. Example rows:
+      label,keys,keys_down,percent
+      track width,Vehicle.frontTrackWidth;Vehicle.rearTrackWidth,,\"-10,10\"
+      mass balance,Vehicle.suspendedMassAtWheels.FL;Vehicle.suspendedMassAtWheels.FR,Vehicle.suspendedMassAtWheels.RL;Vehicle.suspendedMassAtWheels.RR,\"-10,10\"
+
+  param 'massBalance' is a helper that shifts suspended mass front/rear at a
+    constant total: values = absolute front share [%], percent/delta = offset in
+    percentage-points from the current balance. Example row:
+      param,label,percent
+      massBalance,mass balance,\"-2,-1,1,2\"
+
 examples:
   make setups
+  make setups SETUP_ARGS="--config config_pacejka_v2.csv --param toe --values 0.8,0,-0.8 --axle front"
   make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Karb --percent -20,-10,10,20"
   make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Karb --delta 0.2 --axle rear"
   make setups SETUP_ARGS="--config config_pacejka_v2.csv --param Vehicle.suspendedMassHeight --values 0.25,0.29,0.33"
+  make setups SETUP_ARGS="--config config_pacejka_v2.csv --spec sweep.csv"
   make setups SETUP_ARGS="--configs config_pacejka_v2.csv,config_pacejka_v1.csv,config_simple.csv"
 """
 
@@ -488,7 +678,8 @@ def parse_args():
                              "the front or rear side (default both); ignored for an exact key")
     parser.add_argument("--list-axle-params", action="store_true",
                         help="list the front/rear pair params usable as --param X for --config, then exit")
-    parser.add_argument("--spec", help="CSV spec file with columns param,delta,direction,axle (toe only)")
+    parser.add_argument("--spec", help="CSV one-at-a-time spec (columns: param, one of values/percent/delta, "
+                                       "optional direction/axle); each row is swept alone from baseline")
     parser.add_argument("--binary", default="build/laptime_simulator", help="simulator binary path")
     parser.add_argument("--results-dir", default="results", help="root output directory")
     return parser.parse_args()
@@ -509,6 +700,8 @@ def main():
         sys.exit(f"Simulator binary not found: {binary} (run 'make' first)")
     if not args.config and not args.configs:
         sys.exit("Provide --config (parameter sweep) or --configs (explicit config points)")
+    if args.spec and not args.config:
+        sys.exit("--spec (one-at-a-time sweep) needs --config for baseline values")
 
     base_lines = None
     config_name = ""
@@ -518,7 +711,10 @@ def main():
         config_path = os.path.abspath(args.config)
         base_lines = read_config_lines(config_path)
         config_name = os.path.splitext(os.path.basename(config_path))[0]
-        setups, col_label, row_label = build_all_setups(args, config_path)
+        if args.spec:
+            setups, col_label, row_label = build_oat_setups(os.path.abspath(args.spec), config_path)
+        else:
+            setups, col_label, row_label = build_all_setups(args, config_path)
     single = len(setups) == 1
     if single:
         setups[0]["name"] = ""
@@ -529,6 +725,8 @@ def main():
     os.makedirs(run_dir, exist_ok=True)
     run_start = time.perf_counter()
     print(f"Run {run_id:03d} → {run_dir} ({len(setups)} setup{'s' if not single else ''})")
+
+    setup_metrics = {}
 
     def process_setup(setup, base_data):
         setup_dir = run_dir if single else os.path.join(run_dir, setup["name"])
@@ -544,8 +742,12 @@ def main():
         sim_seconds = time.perf_counter() - sim_start
         setup_csv = os.path.join(setup_dir, "yaw_diagram.csv")
         shutil.copyfile(produced_csv, setup_csv)
+        build_dir = os.path.dirname(produced_csv)
+        for name in ("metrics.csv", "hull.csv"):
+            shutil.copyfile(os.path.join(build_dir, name), os.path.join(setup_dir, name))
         render_start = time.perf_counter()
-        data = render_setup(setup_dir, setup_csv, f"{setup['label']} — ", base_data)
+        data, metrics, hull = render_setup(setup_dir, setup_csv, f"{setup['label']} — ", base_data)
+        setup_metrics[setup["name"]] = {"label": setup["label"], "metrics": metrics, "hull": hull}
         render_seconds = time.perf_counter() - render_start
         print(f"  {setup['name'] or config_name} done  (sim {sim_seconds:.1f}s, render {render_seconds:.1f}s)")
         return data
@@ -571,6 +773,9 @@ def main():
         montage_start = time.perf_counter()
         for plot_type in MONTAGE_TYPES:
             build_montage(setups, run_dir, summary_dir, plot_type, col_label, row_label)
+        entries = [setup_metrics[s["name"]] for s in setups if s["name"] in setup_metrics]
+        write_metrics_summary_csv(os.path.join(summary_dir, "metrics_summary.csv"), entries)
+        save_figures(render_metrics_summary_figures(entries), summary_dir)
         print(f"  montages done  ({time.perf_counter() - montage_start:.1f}s)")
 
     print(f"Done: {run_dir} (total {time.perf_counter() - run_start:.1f}s)")
