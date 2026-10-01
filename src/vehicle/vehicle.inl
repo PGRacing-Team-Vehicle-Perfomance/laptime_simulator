@@ -265,6 +265,7 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::bisectDemand(const Config& c
     return step;
 }
 
+// joint 3x3 Newton on (latAcc, demand, longAcc); falls back to the relaxation solver
 template <typename Frame>
 typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& config,
                                                                  float tolerance,
@@ -273,10 +274,100 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
     float maxForce = combinedTotalMass.value * earthAcc * 2.0f;
     float maxLatAcc = lateralAccBracketG * earthAcc;
 
-    longitudinalAccEstimate = 0;
+    bool warm = warmStartEnabled && warmStartValid;
+    coupledCalls++;
 
     SolverStep step;
+    auto residual3 = [&](float latAcc, float demand, float longAcc, float r[3]) {
+        longitudinalAccEstimate = longAcc;
+        longForceDemand = demand;
+        step = evaluateAt(Y<Frame>{latAcc}, config);
+        r[0] = step.latAcc.v - latAcc;
+        r[1] = calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v - targetLongAcc;
+        r[2] = calculateBodyLongAcc(step.tireForcesX, step.tireForcesY).v - longAcc;
+    };
+    auto det3 = [](const float m[3][3]) {
+        return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    };
+
+    float x[3] = {warm ? warmLatAcc : 0.f, warm ? warmDemand : 0.f, warm ? warmLongAcc : 0.f};
+    const float eps[3] = {jacobianRelStep * maxLatAcc, jacobianRelStep * maxForce,
+                          jacobianRelStep * maxLatAcc};
+    const float bound[3] = {maxLatAcc, maxForce, maxLatAcc};
+    bool converged = false;
+    for (int iter = 0; iter < newtonIterations; iter++) {
+        coupledNewtonIters++;
+        float r[3];
+        residual3(x[0], x[1], x[2], r);
+        if (std::abs(r[0]) < tolerance && std::abs(r[1]) < tolerance &&
+            std::abs(r[2]) < tolerance) {
+            converged = true;
+            break;
+        }
+        float J[3][3];
+        for (int c = 0; c < 3; c++) {
+            float xp[3] = {x[0], x[1], x[2]};
+            xp[c] += eps[c];
+            float rp[3];
+            residual3(xp[0], xp[1], xp[2], rp);
+            for (int row = 0; row < 3; row++) J[row][c] = (rp[row] - r[row]) / eps[c];
+        }
+        float det = det3(J);
+        if (std::abs(det) < newtonSingularJacobianEpsilon) break;
+        float d[3];
+        for (int c = 0; c < 3; c++) {  // Cramer: solve J d = r
+            float Jc[3][3];
+            for (int a = 0; a < 3; a++)
+                for (int b = 0; b < 3; b++) Jc[a][b] = (b == c) ? r[a] : J[a][b];
+            d[c] = det3(Jc) / det;
+        }
+        // damp the step to stay within the physical bounds
+        float s = 1.f;
+        for (int c = 0; c < 3; c++) {
+            float nx = x[c] - d[c];
+            if (std::abs(nx) > bound[c] && d[c] != 0.f) {
+                float sc = (x[c] - std::copysign(bound[c], nx)) / d[c];
+                if (sc > 0.f) s = std::min(s, sc);
+            }
+        }
+        if (s < 1e-3f) break;  // step fully blocked at the boundary -> give up to the fallback
+        for (int c = 0; c < 3; c++) x[c] -= s * d[c];
+    }
+
+    if (!converged) {
+        coupledBisectFallbacks++;
+        return solveCoupledRelaxed(config, tolerance, maxIterations);  // sets warm state itself
+    }
+    float r[3];
+    residual3(x[0], x[1], x[2], r);  // re-evaluate so `step` holds the solution
+    if (warmStartEnabled) {
+        warmLatAcc = x[0];
+        warmDemand = x[1];
+        warmLongAcc = x[2];
+        warmStartValid = true;
+    }
+    return step;
+}
+
+// fallback: secant-accelerated longAcc relaxation around a 2x2 Newton, bisection backstop
+template <typename Frame>
+typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupledRelaxed(const Config& config,
+                                                                        float tolerance,
+                                                                        int maxIterations) {
+    float earthAcc = config.get("Environment", "earthAcc");
+    float maxForce = combinedTotalMass.value * earthAcc * 2.0f;
+    float maxLatAcc = lateralAccBracketG * earthAcc;
+
+    bool warm = warmStartEnabled && warmStartValid;
+    longitudinalAccEstimate = warm ? warmLongAcc : 0;
+
+    float storeLatAcc = 0, storeDemand = 0;
+    float prevLongAcc = 0, prevH = 0;
+    SolverStep step;
     for (int outer = 0; outer < longitudinalRelaxIterations; outer++) {
+        coupledOuterSweeps++;
         float frozenLongAcc = longitudinalAccEstimate;
 
         auto residuals = [&](float latAcc, float demand, float& latResidual, float& longResidual) {
@@ -288,12 +379,13 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
                 calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v - targetLongAcc;
         };
 
-        float latAcc = 0;
-        float demand = 0;
+        float latAcc = (warm && outer == 0) ? warmLatAcc : 0;
+        float demand = (warm && outer == 0) ? warmDemand : 0;
         float epsLat = jacobianRelStep * maxLatAcc;
         float epsDemand = jacobianRelStep * maxForce;
         bool converged = false;
         for (int iter = 0; iter < newtonIterations; iter++) {
+            coupledNewtonIters++;
             float r1, r2;
             residuals(latAcc, demand, r1, r2);
             if (std::abs(r1) < tolerance && std::abs(r2) < tolerance) {
@@ -316,16 +408,39 @@ typename Vehicle<Frame>::SolverStep Vehicle<Frame>::solveCoupled(const Config& c
             float r1, r2;
             residuals(latAcc, demand, r1, r2);
         } else {
+            coupledBisectFallbacks++;
             longitudinalAccEstimate = frozenLongAcc;
             step = bisectDemand(config, maxForce, maxLatAcc, tolerance, maxIterations);
         }
+        storeLatAcc = latAcc;
+        storeDemand = demand;
 
+        // secant step on the longAcc fixed point (first sweep / flat slope: damped step)
         float bodyLongAcc = calculateBodyLongAcc(step.tireForcesX, step.tireForcesY).v;
-        longitudinalAccEstimate = frozenLongAcc + 0.5f * (bodyLongAcc - frozenLongAcc);
+        float h = bodyLongAcc - frozenLongAcc;
+        float denom = h - prevH;
+        float next = (outer == 0 || std::abs(denom) < newtonSingularJacobianEpsilon)
+                         ? frozenLongAcc + 0.5f * h
+                         : frozenLongAcc - h * (frozenLongAcc - prevLongAcc) / denom;
+        prevLongAcc = frozenLongAcc;
+        prevH = h;
+        longitudinalAccEstimate = std::clamp(next, -maxLatAcc, maxLatAcc);
         if (std::abs(longitudinalAccEstimate - frozenLongAcc) < tolerance) break;
     }
 
+    if (warmStartEnabled) {
+        warmLatAcc = storeLatAcc;
+        warmDemand = storeDemand;
+        warmLongAcc = longitudinalAccEstimate;
+        warmStartValid = true;
+    }
     return step;
+}
+
+template <typename Frame>
+void Vehicle<Frame>::setWarmStart(bool enabled) {
+    warmStartEnabled = enabled;
+    warmStartValid = false;  // first solve after (re)enabling stays cold and deterministic
 }
 
 template <typename Frame>
