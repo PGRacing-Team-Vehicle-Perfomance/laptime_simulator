@@ -458,7 +458,7 @@ PointSolution Vehicle<Frame>::assembleSolution(float latAcc, float yawMoment,
     PointSolution solution;
     solution.latAcc = latAcc;
     solution.yawMoment = yawMoment;
-    solution.longAcc = longitudinalAccEstimate;
+    solution.longAcc = calculatePathLongAcc(step.tireForcesX, step.tireForcesY).v;
     solution.aeroDownforce = aeroDownforce;
     solution.aeroDrag = aeroDrag;
     solution.totalLoad = totalLoad;
