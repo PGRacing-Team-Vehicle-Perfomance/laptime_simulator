@@ -1,4 +1,4 @@
-.PHONY: all build debug run plot tire setups setups-help setups-axle-params rebuild clean help venv
+.PHONY: all build debug run plot tire trim setups setups-help setups-axle-params rebuild clean help venv
 
 BUILD_DIR := build
 BUILD_TYPE ?= Release
@@ -47,6 +47,14 @@ endif
 	@$(EXECUTABLE) $(CONFIG) tire
 	@$(PYTHON) tools/plot_tire.py $(BUILD_DIR)/tire_model.csv
 
+trim: build venv
+ifeq ($(CONFIG),)
+	$(error CONFIG variable must be explicitly set. Example: make trim CONFIG=config_pacejka_v2_steering.csv (config must enable the yaw-zero mode))
+endif
+	@echo "=== Tracing yaw-zero trim locus ==="
+	@$(EXECUTABLE) $(CONFIG)
+	@$(PYTHON) tools/plot_yaw_zero_trim.py $(BUILD_DIR)/yaw_diagram.csv
+
 setups: build venv
 	@echo "=== Generating setup matrix ==="
 	@$(PYTHON) tools/generate_setups.py --binary $(EXECUTABLE) $(SETUP_ARGS)
@@ -72,6 +80,8 @@ help:
 	@echo "  debug    Build Debug"
 	@echo "  run      Run"
 	@echo "  plot     Run and generate plot"
+	@echo "  tire     Dump the tire model and plot it (CONFIG=...)"
+	@echo "  trim     Trace the yaw-zero trim locus and plot it (CONFIG=... with yaw-zero enabled)"
 	@echo "  setups        Generate a setup-sweep matrix of diagrams"
 	@echo "  setups-help   Show all setup-sweep options and examples"
 	@echo "  setups-axle-params List the front/rear pair params usable with --param/--axle"
@@ -85,5 +95,6 @@ help:
 	@echo "  make debug"
 	@echo "  make run CONFIG=config_pacejka_v1.csv"
 	@echo "  make plot CONFIG=config_simple.csv"
+	@echo "  make trim CONFIG=config_pacejka_v2_steering.csv"
 	@echo "  make setups"
 	@echo "  make setups SETUP_ARGS=\"--config config_pacejka_v2.csv --param Vehicle.frontKarb --percent 20\""

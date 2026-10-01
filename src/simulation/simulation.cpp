@@ -171,6 +171,270 @@ std::vector<DiagramSample> Simulation::getYawMomentDiagramPoints(
             centerSteering = i;
     }
 
+    // Yaw-zero (trim) mode: find the yawMoment = 0 locus by scanning slip on each steering
+    // line and pinning every sign change; independent lines, so parallel. Folds show up as two
+    // slip crossings on the lines just inside them.
+    if (cfg.getString("YawZero", "enabled", "false") == "true") {
+        if (cfg.getString("Refine", "enabled", "true") == "true")
+            fprintf(stderr, "[sim] note: refine does nothing in yaw-zero mode\n");
+        float slipTol = cfg.get("YawZero", "slipTolerance", 0.01f);  // false-position axis tol (deg)
+        int maxIter = static_cast<int>(cfg.get("YawZero", "maxBisect", 40.0f));  // max falsi iters
+        float residualTol = cfg.get("YawZero", "residualTolerance", 50.0f);  // |Mz| root acceptance
+        float mergeRadius = cfg.get("YawZero", "mergeRadius", 0.02f);  // normalized dedup radius
+        float scanStep = cfg.get("YawZero", "scanStep", 2.0f);
+        // crossing root-finder: bisect | illinois | anderson | ridders | brent | itp
+        std::string rootFinder = cfg.getString("YawZero", "rootFinder", "anderson");
+        if (scanStep <= 0.f || maxSteeringAngle <= 0.f || maxSlipAngle <= 0.f) {
+            fprintf(stderr, "[sim] yaw-zero needs YawZero,scanStep>0 and positive max "
+                            "steering/slip; skipping\n");
+            return {};
+        }
+        auto tTrim = Clock::now();
+
+        {
+            auto isRootScan = [&](const DiagramSample& s) {
+                return std::isfinite(s.solution.yawMoment) &&
+                       std::abs(s.solution.yawMoment) <= residualTol;
+            };
+            auto evalLine = [&](Vehicle<Frame>& v, float steeringDeg, float slipDeg) {
+                return solveAt(v, steeringDeg, slipDeg, true, false);
+            };
+            // false position with a stale-endpoint down-weight (Illinois/Anderson-Bjorck)
+            auto ymOf = [](const DiagramSample& s) { return s.solution.yawMoment; };
+            auto keepBest = [&](const DiagramSample& s, DiagramSample& best) {
+                if (std::abs(ymOf(s)) < std::abs(ymOf(best))) best = s;
+            };
+            // Plain bisection: 1 eval/iter, linear, the robust baseline.
+            auto rfBisect = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                                float hi, DiagramSample sHi) {
+                float fLo = ymOf(sLo), fHi = ymOf(sHi);
+                DiagramSample best = std::abs(fLo) <= std::abs(fHi) ? sLo : sHi;
+                for (int it = 0; it < maxIter && (hi - lo) > slipTol; it++) {
+                    float c = 0.5f * (lo + hi);
+                    DiagramSample sc = evalLine(v, steeringDeg, c);
+                    float fc = ymOf(sc);
+                    if (!std::isfinite(fc)) break;
+                    keepBest(sc, best);
+                    if ((fc < 0.f) == (fLo < 0.f)) lo = c, fLo = fc;
+                    else hi = c, fHi = fc;
+                }
+                return best;
+            };
+            // False position with a stale-endpoint down-weight (Illinois or Anderson-Bjorck).
+            auto rfFalsi = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                               float hi, DiagramSample sHi, bool anderson) {
+                float fLo = ymOf(sLo), fHi = ymOf(sHi);
+                DiagramSample best = std::abs(fLo) <= std::abs(fHi) ? sLo : sHi;
+                int retainLo = 0, retainHi = 0;
+                for (int it = 0; it < maxIter && (hi - lo) > slipTol; it++) {
+                    float denom = fHi - fLo;
+                    float c = denom != 0.f ? (lo * fHi - hi * fLo) / denom : 0.5f * (lo + hi);
+                    if (!(c > lo && c < hi)) c = 0.5f * (lo + hi);
+                    DiagramSample sc = evalLine(v, steeringDeg, c);
+                    float fc = ymOf(sc);
+                    if (!std::isfinite(fc)) break;
+                    keepBest(sc, best);
+                    if ((fc < 0.f) == (fLo < 0.f)) {  // root in [c, hi]; hi retained
+                        float g = anderson ? 1.f - fc / fLo : 0.5f;
+                        lo = c, fLo = fc;
+                        if (anderson) fHi *= (g > 0.f ? g : 0.5f);
+                        else if (++retainLo >= 2) fHi *= 0.5f, retainLo = 0;
+                    } else {  // root in [lo, c]; lo retained
+                        float g = anderson ? 1.f - fc / fHi : 0.5f;
+                        hi = c, fHi = fc;
+                        if (anderson) fLo *= (g > 0.f ? g : 0.5f);
+                        else if (++retainHi >= 2) fLo *= 0.5f, retainHi = 0;
+                    }
+                }
+                return best;
+            };
+            // Ridders: 2 evals/iter (midpoint + exponential correction), ~quadratic, robust.
+            auto rfRidders = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                                 float hi, DiagramSample sHi) {
+                float x0 = lo, x1 = hi, f0 = ymOf(sLo), f1 = ymOf(sHi);
+                DiagramSample s0 = sLo, s1 = sHi;
+                DiagramSample best = std::abs(f0) <= std::abs(f1) ? sLo : sHi;
+                for (int it = 0; it < maxIter && (x1 - x0) > slipTol; it++) {
+                    float xm = 0.5f * (x0 + x1);
+                    DiagramSample sm = evalLine(v, steeringDeg, xm);
+                    float fm = ymOf(sm);
+                    if (!std::isfinite(fm)) break;
+                    keepBest(sm, best);
+                    float s = std::sqrt(fm * fm - f0 * f1);
+                    if (s == 0.f) break;
+                    float xn = xm + (xm - x0) * ((f0 >= f1 ? 1.f : -1.f) * fm / s);
+                    DiagramSample sn = evalLine(v, steeringDeg, xn);
+                    float fn = ymOf(sn);
+                    if (!std::isfinite(fn)) break;
+                    keepBest(sn, best);
+                    if ((fm < 0.f) != (fn < 0.f)) {
+                        x0 = xm, f0 = fm, s0 = sm, x1 = xn, f1 = fn, s1 = sn;
+                    } else if ((f0 < 0.f) != (fn < 0.f)) {
+                        x1 = xn, f1 = fn, s1 = sn;
+                    } else {
+                        x0 = xn, f0 = fn, s0 = sn;
+                    }
+                    if (x1 < x0) std::swap(x0, x1), std::swap(f0, f1), std::swap(s0, s1);
+                }
+                return best;
+            };
+            // Brent-Dekker: inverse-quadratic / secant with a bisection fallback, superlinear.
+            auto rfBrent = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                               float hi, DiagramSample sHi) {
+                float a = lo, b = hi, fa = ymOf(sLo), fb = ymOf(sHi);
+                DiagramSample sa = sLo, sb = sHi;
+                DiagramSample best = std::abs(fa) <= std::abs(fb) ? sLo : sHi;
+                if (std::abs(fa) < std::abs(fb)) {
+                    std::swap(a, b), std::swap(fa, fb), std::swap(sa, sb);
+                }
+                float c = a, fc = fa, d = a;
+                bool mflag = true;
+                for (int it = 0; it < maxIter && std::abs(b - a) > slipTol; it++) {
+                    float s;
+                    if (fa != fc && fb != fc)
+                        s = a * fb * fc / ((fa - fb) * (fa - fc)) +
+                            b * fa * fc / ((fb - fa) * (fb - fc)) +
+                            c * fa * fb / ((fc - fa) * (fc - fb));
+                    else
+                        s = b - fb * (b - a) / (fb - fa);
+                    float l = 0.25f * (3.f * a + b);
+                    bool bisect = !((s > std::min(l, b) && s < std::max(l, b))) ||
+                                  (mflag && std::abs(s - b) >= 0.5f * std::abs(b - c)) ||
+                                  (!mflag && std::abs(s - b) >= 0.5f * std::abs(c - d)) ||
+                                  (mflag && std::abs(b - c) < slipTol) ||
+                                  (!mflag && std::abs(c - d) < slipTol);
+                    if (bisect) s = 0.5f * (a + b), mflag = true;
+                    else mflag = false;
+                    DiagramSample ss = evalLine(v, steeringDeg, s);
+                    float fs = ymOf(ss);
+                    if (!std::isfinite(fs)) break;
+                    keepBest(ss, best);
+                    d = c, c = b, fc = fb;
+                    if ((fa < 0.f) != (fs < 0.f)) b = s, fb = fs, sb = ss;
+                    else a = s, fa = fs, sa = ss;
+                    if (std::abs(fa) < std::abs(fb)) {
+                        std::swap(a, b), std::swap(fa, fb), std::swap(sa, sb);
+                    }
+                }
+                return best;
+            };
+            // ITP (Interpolate-Truncate-Project): minimax-optimal eval count, superlinear average.
+            auto rfITP = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                             float hi, DiagramSample sHi) {
+                float a = lo, b = hi, fa = ymOf(sLo), fb = ymOf(sHi);
+                DiagramSample sa = sLo, sb = sHi;
+                DiagramSample best = std::abs(fa) <= std::abs(fb) ? sLo : sHi;
+                float eps = slipTol;
+                float k1 = 0.2f / std::max(b - a, 1e-6f);
+                float k2 = 2.0f;
+                int n0 = 1;
+                int nhalf = static_cast<int>(std::ceil(std::log2(std::max(b - a, eps) / (2.f * eps))));
+                int nmax = nhalf + n0;
+                for (int j = 0; j < maxIter && (b - a) > 2.f * eps; j++) {
+                    float xf = (a * fb - b * fa) / (fb - fa);
+                    float xhalf = 0.5f * (a + b);
+                    float sigma = (xhalf - xf) >= 0.f ? 1.f : -1.f;
+                    float delta = k1 * std::pow(b - a, k2);
+                    float xt = delta <= std::abs(xhalf - xf) ? xf + sigma * delta : xhalf;
+                    float rho = eps * std::pow(2.f, static_cast<float>(nmax - j)) - 0.5f * (b - a);
+                    float xitp = std::abs(xt - xhalf) <= rho ? xt : xhalf - sigma * rho;
+                    DiagramSample si = evalLine(v, steeringDeg, xitp);
+                    float fi = ymOf(si);
+                    if (!std::isfinite(fi)) break;
+                    keepBest(si, best);
+                    if ((fi < 0.f) == (fa < 0.f)) a = xitp, fa = fi, sa = si;
+                    else b = xitp, fb = fi, sb = si;
+                }
+                return best;
+            };
+            auto refineRoot = [&](Vehicle<Frame>& v, float steeringDeg, float lo, DiagramSample sLo,
+                                  float hi, DiagramSample sHi) {
+                if (rootFinder == "bisect") return rfBisect(v, steeringDeg, lo, sLo, hi, sHi);
+                if (rootFinder == "illinois") return rfFalsi(v, steeringDeg, lo, sLo, hi, sHi, false);
+                if (rootFinder == "anderson") return rfFalsi(v, steeringDeg, lo, sLo, hi, sHi, true);
+                if (rootFinder == "ridders") return rfRidders(v, steeringDeg, lo, sLo, hi, sHi);
+                if (rootFinder == "itp") return rfITP(v, steeringDeg, lo, sLo, hi, sHi);
+                return rfBrent(v, steeringDeg, lo, sLo, hi, sHi);  // default
+            };
+            // scan one steering line: step slip, emit a trim point at each Mz sign change
+            auto scanLine = [&](Vehicle<Frame>& v, float steeringDeg,
+                                std::vector<DiagramSample>& emit) {
+                v.setWarmStart(true);  // reset per line: independent of this thread's prior lines
+                DiagramSample prev = evalLine(v, steeringDeg, -maxSlipAngle);
+                float prevPos = -maxSlipAngle;
+                for (float pos = -maxSlipAngle + scanStep; pos <= maxSlipAngle + 1e-4f;
+                     pos += scanStep) {
+                    DiagramSample cur = evalLine(v, steeringDeg, pos);
+                    float fp = prev.solution.yawMoment, fc = cur.solution.yawMoment;
+                    if (std::isfinite(fp) && std::isfinite(fc) && (fp < 0.f) != (fc < 0.f)) {
+                        DiagramSample r = refineRoot(v, steeringDeg, prevPos, prev, pos, cur);
+                        if (isRootScan(r)) emit.push_back(r);
+                    }
+                    prev = cur;
+                    prevPos = pos;
+                }
+            };
+
+            std::vector<float> steerSamples;
+            for (float d = -maxSteeringAngle; d <= maxSteeringAngle + 1e-4f; d += scanStep)
+                steerSamples.push_back(d);
+            std::vector<std::vector<DiagramSample>> lines(steerSamples.size());
+            size_t lineDone = 0;
+            printProgressBar("yaw-zero scan", 0, steerSamples.size());
+#pragma omp parallel for schedule(dynamic)
+            for (size_t i = 0; i < steerSamples.size(); i++) {
+                scanLine(*pool[workerIndex()], steerSamples[i], lines[i]);
+#pragma omp critical
+                printProgressBar("yaw-zero scan", ++lineDone, steerSamples.size());
+            }
+
+            // concat per-line crossings (fixed order -> deterministic) and dedup
+            std::vector<DiagramSample> out;
+            auto covered = [&](const DiagramSample& s) {
+                for (const DiagramSample& o : out) {
+                    float dd = (s.steering - o.steering) / maxSteeringAngle;
+                    float db = (s.slip - o.slip) / maxSlipAngle;
+                    if (dd * dd + db * db < mergeRadius * mergeRadius) return true;
+                }
+                return false;
+            };
+            for (const std::vector<DiagramSample>& ln : lines)
+                for (const DiagramSample& s : ln)
+                    if (!covered(s)) out.push_back(s);
+            std::sort(out.begin(), out.end(), [](const DiagramSample& a, const DiagramSample& b) {
+                return a.steering != b.steering ? a.steering < b.steering : a.slip < b.slip;
+            });
+
+            double trimSeconds = secondsSince(tTrim);
+            double totalSeconds = secondsSince(tStart);
+            size_t evaluations = 0, calls = 0, sweeps = 0, newtons = 0, fallbacks = 0;
+            for (const auto& vp : pool) {
+                evaluations += vp->solverEvaluations;
+                calls += vp->coupledCalls;
+                sweeps += vp->coupledOuterSweeps;
+                newtons += vp->coupledNewtonIters;
+                fallbacks += vp->coupledBisectFallbacks;
+            }
+            double ptsD = out.empty() ? 1.0 : static_cast<double>(out.size());
+            fprintf(stderr,
+                    "[sim] mode=yaw-zero(scan)  threads=%d  steering-lines=%zu\n"
+                    "      trim-pts=%zu  total=%.3fs (%.0f pts/s)  solve=%.3fs  evals=%zu "
+                    "(%.1f/pt)\n",
+                    workerCount(), steerSamples.size(), out.size(), totalSeconds,
+                    out.size() / std::max(1e-9, totalSeconds), trimSeconds, evaluations,
+                    evaluations / ptsD);
+            if (calls > 0)
+                fprintf(stderr,
+                        "      eq-solve: calls=%zu  newtonIters/call=%.2f  "
+                        "fallback-to-relaxed=%.1f%%  evals/call=%.1f\n",
+                        calls, static_cast<double>(newtons) / calls, 100.0 * fallbacks / calls,
+                        static_cast<double>(evaluations) / calls);
+            (void)sweeps;
+            return out;
+        }
+
+    }
+
     auto tBaseStart = Clock::now();
     std::vector<std::pair<float, std::vector<DiagramSample>>> isolines(slipAngles.size());
     std::vector<double> lineSeconds(slipAngles.size(), 0.0);
