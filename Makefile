@@ -1,4 +1,4 @@
-.PHONY: all build debug run plot setups setups-help setups-axle-params rebuild clean help venv
+.PHONY: all build debug run plot tire setups setups-help setups-axle-params rebuild clean help venv
 
 BUILD_DIR := build
 BUILD_TYPE ?= Release
@@ -38,6 +38,14 @@ $(VENV_DIR)/bin/activate:
 plot: run venv
 	@echo "=== Generating plot ==="
 	@$(PYTHON) tools/plot_yaw_diagram.py $(BUILD_DIR)/yaw_diagram.csv
+
+tire: build venv
+ifeq ($(CONFIG),)
+	$(error CONFIG variable must be explicitly set. Example: make tire CONFIG=config_pacejka_v2.csv)
+endif
+	@echo "=== Dumping tire model ==="
+	@$(EXECUTABLE) $(CONFIG) tire
+	@$(PYTHON) tools/plot_tire.py $(BUILD_DIR)/tire_model.csv
 
 setups: build venv
 	@echo "=== Generating setup matrix ==="

@@ -38,8 +38,11 @@ class Simulation {
         const std::function<std::unique_ptr<Vehicle<Frame>>()>& makeVehicle, float speed,
         const Config& cfg, float maxSteeringAngle, float steeringAngleStep, float maxSlipAngle,
         float slipAngleStep, float tolerance, int maxIterations);
+    template <typename Frame>
+    void dumpTireFrame(FILE* f);
 
    public:
     Simulation(Config config) : cfg(config) {}
     std::vector<DiagramSample> run();
+    void dumpTireModel(const std::string& path);
 };

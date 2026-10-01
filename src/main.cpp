@@ -16,6 +16,11 @@ int main(int argc, char* argv[]) {
     Config cfg(configPath);
     Simulation sim(cfg);
 
+    if (argc > 2 && std::string(argv[2]) == "tire") {
+        sim.dumpTireModel("build/tire_model.csv");
+        return 0;
+    }
+
     std::vector<DiagramSample> points = sim.run();
 
     FILE* f = fopen("build/yaw_diagram.csv", "w");
